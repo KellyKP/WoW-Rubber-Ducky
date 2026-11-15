@@ -22,7 +22,7 @@ Rubber Ducky makes fishing easier on the ears and eyes. It hushes the world so t
 2. Unzip it into `World of Warcraft/_forever_/Interface/AddOns/`, so that you have `AddOns/RubberDucky/RubberDucky.toc`.
 3. Restart the game, or type `/reload`.
 
-The first time you log in, a welcome screen helps you set things up. After that, type `/ducky` to open the settings. They're also under **Options > AddOns > Professions > Rubber Ducky**.
+The first time you log in, a welcome screen helps you set things up. After that, type `/ducky` to open the settings. They're also under **Options > AddOns > Rubber Ducky**.
 
 ## Commands
 
