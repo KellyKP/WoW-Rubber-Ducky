@@ -1,0 +1,35 @@
+# Move this file to .github/workflows/release.yml to turn it on.
+# Push a tag like v0.21.0 and this builds RubberDucky-v0.21.0.zip (the addon
+# folder only, without tests or repo files) and attaches it to a GitHub release.
+# Upload that same zip to CurseForge.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          pip install lupa
+          python3 tests/run_tests.py
+
+      - name: Build zip
+        run: |
+          mkdir -p build/RubberDucky
+          tar --exclude=./build --exclude=./.git --exclude=./.github --exclude=./tests --exclude=./tools --exclude=./docs \
+              --exclude=./.gitignore --exclude=./.pkgmeta -cf - . | tar -xf - -C build/RubberDucky
+          cd build && zip -qr "../RubberDucky-${GITHUB_REF_NAME}.zip" RubberDucky
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: RubberDucky-${{ github.ref_name }}.zip
+          body_path: CHANGELOG.md

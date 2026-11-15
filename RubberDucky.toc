@@ -1,0 +1,24 @@
+## Interface: 16001
+## Title: |cffffd100Rubber Ducky|r
+## Notes: Your little fishing buddy.
+## Author: Rubber Ducky
+## Version: 0.21.0
+## Category: Professions
+## Category-enUS: Professions
+## X-License: MIT
+## SavedVariables: RubberDuckyDB
+## IconTexture: Interface\AddOns\RubberDucky\Media\bobber_duck
+
+Core.lua
+Console.lua
+Sound.lua
+Bobber.lua
+Camera.lua
+OneKey.lua
+Gear.lua
+Probe.lua
+Picker.lua
+Splash.lua
+UI.lua
+Options.lua
+Welcome.lua
