@@ -64,6 +64,9 @@ local function AddPoleSwapCard(p)
     nextLine:SetPoint("TOPLEFT", head, "BOTTOMLEFT", 0, -6)
     nextLine:SetJustifyH("LEFT")
     swap:Text("Swaps your fishing pole and your weapon.", true)
+    swap:Toggle{ label = "Show a splash when you swap", key = "swapSplash" }
+    swap:Toggle{ label = "Play a sound when you swap", key = "swapSound" }
+    swap:Buttons{ { "Show me", function() ns.Splash:PreviewSwap() end, width = 120 } }
 
     local function Name(id)
         if not id then return end
@@ -72,7 +75,7 @@ local function AddPoleSwapCard(p)
     end
     local function Paint()
         icon.tex:SetTexture(ns.Gear:NextIcon())
-        local w = ns.db.lastWeapons
+        local w = ns.Gear.Mine().weapons
         if ns.Gear.PoleEquipped() then
             if w and w.mh then
                 nextLine:SetText("Next press: |cffffffff" .. Name(w.mh) .. (w.oh and (" + " .. Name(w.oh)) or "") .. "|r")
@@ -101,8 +104,14 @@ local function OverviewPage()
     Feature(c, "Interface\\Icons\\INV_Fishingpole_02", "One-button fishing", "One button casts and reels in; your catch lands in your bags with a splash.")
     c:Advance(4)
     c:Text("Pick a section on the left to change its settings.", true)
+    c:Buttons{ { "What's new", function() ns.Changelog:Show() end, width = 140 } }
 
     AddPoleSwapCard(p)
+
+    local share = p:Card("Share settings")
+    share:Text("Share your setup with a friend, or send it along when asking for help.", true)
+    share:Buttons{ { "Copy my settings", function() ns.Share:ShowCopy() end, width = 160 },
+        { "Paste settings", function() ns.Share:ShowPaste() end, width = 160 } }
 
     local hello = p:Card("Welcome")
     hello:Toggle{ label = "Say hello in chat when you log in", key = "welcome",
@@ -181,6 +190,7 @@ local function BobberPage()
     rl:SetText("Random each cast")
     random:SetScript("OnClick", function(self)
         ns.db.markerStyle = self:GetChecked() and 0 or (ns.db.lastStyle or 15)
+        if self:GetChecked() then ns.db.markerEnabled = true end
         UI.Later(function() marker(); p:Refresh() end)
     end)
     p:OnRefresh(function(page)
@@ -353,6 +363,10 @@ local function DeveloperPage()
     con:Text("With debug mode on, Rubber Ducky's status messages go to a small console window instead of chat.")
     con:Buttons{ { "Show console", function() ns.Console:Show() end }, { "Copy console", function() ns.Console.ShowCopy() end } }
 
+    local share = p:Card("Sharing")
+    share:Toggle{ label = "Include debug info when copying settings", key = "shareDebug",
+        desc = "Version, game details and your list of addons." }
+
     local rec = p:Card("Event recorder")
     rec:Toggle{ label = "Record what the game reports during each cast", key = "probeEnabled" }
     rec:Buttons{ { "Show log", function() ns.Probe:ShowLog() end } }
@@ -427,8 +441,22 @@ local function Call(step, id)
     return ok
 end
 
+local openAfterCombat
 function Options:Open()
     if not category then return false end
+    -- the Settings window can't be opened safely by an addon in combat
+    if InCombatLockdown() then
+        if not openAfterCombat then
+            openAfterCombat = CreateFrame("Frame")
+            openAfterCombat:SetScript("OnEvent", function(f)
+                f:UnregisterEvent("PLAYER_REGEN_ENABLED")
+                Options:Open()
+            end)
+        end
+        openAfterCombat:RegisterEvent("PLAYER_REGEN_ENABLED")
+        ns.Chat("Hang tight! Settings will open once combat's over.")
+        return true
+    end
     local id = category:GetID()
     ns.openedSettingsAt = GetTime()
     Call("open settings", id)

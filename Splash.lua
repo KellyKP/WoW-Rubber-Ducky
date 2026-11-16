@@ -234,8 +234,8 @@ Splash.MISSES = {
     missed  = { "miss_away",    "You missed that one, try again!",       { "IG_QUEST_FAILED", "IG_QUEST_LOG_ABANDON_QUEST" } },
 }
 
-local function MissSound(names)
-    if not ns.db.splashMissSound or not SOUNDKIT then return end
+local function PlayFirst(names)
+    if not SOUNDKIT then return end
     for _, n in ipairs(names) do
         local id = SOUNDKIT[n]
         if id then pcall(PlaySound, id, "SFX"); return end
@@ -286,18 +286,40 @@ function Splash:AnimateMiss()
     miss:SetPoint("TOP", UIParent, "CENTER", 0, (ns.db.splashY or 200) + 210 + y)
 end
 
-function Splash:ShowMiss(kind)
-    if not ns.db.splashMisses then return end
-    local text = Splash.MISSES[kind] or Splash.MISSES.missed
+-- the softer drop-in splash, shared by misses and pole swaps
+local function ShowSoft(art, hint, sounds)
     if not pcall(BuildMiss) or not miss then return end
     if frame and frame:IsShown() then return end -- catch splash showing
-    miss.art:SetTexture(MEDIA .. "splash_" .. text[1])
-    miss.sub:SetText(text[2])
-    MissSound(text[3])
+    miss.art:SetTexture(MEDIA .. "splash_" .. art)
+    miss.sub:SetText(hint or "")
+    if sounds then PlayFirst(sounds) end
     miss:SetScale(ns.db.splashSize or 0.7)
     missStart = GetTime()
     miss:Show()
     Splash:AnimateMiss()
+end
+
+function Splash:ShowMiss(kind)
+    if not ns.db.splashMisses then return end
+    local m = Splash.MISSES[kind] or Splash.MISSES.missed
+    ShowSoft(m[1], m[2], ns.db.splashMissSound and m[3])
+end
+
+-- Pole swap: "pole" or "weapon"
+Splash.SWAPS = {
+    pole   = { "swap_pole",   { "UI_PET_BATTLE_START", "UI_GARRISON_TOAST_FOLLOWER_GAINED", "IG_QUEST_LIST_OPEN" } },
+    weapon = { "swap_weapon", { "READY_CHECK", "RAID_WARNING" } },
+}
+
+function Splash:ShowSwap(kind, preview)
+    if not ns.db.swapSplash and not preview then return end
+    local s = Splash.SWAPS[kind]
+    if s then ShowSoft(s[1], nil, ns.db.swapSound and s[2]) end
+end
+
+function Splash:PreviewSwap()
+    self.previewSwapPole = not self.previewSwapPole
+    self:ShowSwap(self.previewSwapPole and "pole" or "weapon", true)
 end
 
 function Splash:PreviewMiss()

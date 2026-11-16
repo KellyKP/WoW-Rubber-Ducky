@@ -5,8 +5,4 @@ manual-changelog:
   markup-type: markdown
 
 ignore:
-  - tests
-  - tools
   - docs
-  - .github
-  - .gitignore

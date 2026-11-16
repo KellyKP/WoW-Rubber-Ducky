@@ -47,6 +47,10 @@ ns.defaults = {
     splashMisses     = true,
     splashMissSound  = true,
 
+    -- Pole swap
+    swapSplash = true,
+    swapSound  = true,
+
     -- General
     welcome        = true,
     softTargetHelp = true,
@@ -54,6 +58,7 @@ ns.defaults = {
     -- Developer
     debugMode    = false,
     probeEnabled = false,
+    shareDebug   = false,
 }
 
 local EVENTS = CreateFrame("Frame")
@@ -66,6 +71,10 @@ ns.castStart = 0
 -------------------------------------------------------------------------------
 -- Helpers
 -------------------------------------------------------------------------------
+
+-- The few messages meant for chat: duck icon + name in front.
+local CHAT_PREFIX = "|TInterface\\AddOns\\RubberDucky\\Media\\bobber_duck:14:14|t |cffffd100Rubber Ducky:|r "
+function ns.Chat(msg) print(CHAT_PREFIX .. msg) end
 
 -- Status messages go to the debug console, never to chat.
 ns.consoleLines = {}
@@ -327,6 +336,7 @@ EVENTS:SetScript("OnEvent", function(_, event, ...)
         local name = ...
         if name ~= ADDON then return end
         RubberDuckyDB = RubberDuckyDB or {}
+        RubberDuckyDB.lastWeapons, RubberDuckyDB.lastPole = nil, nil -- 0.21 kept these account-wide
         for k, v in pairs(ns.defaults) do
             if RubberDuckyDB[k] == nil then RubberDuckyDB[k] = v end
         end
@@ -345,7 +355,7 @@ EVENTS:SetScript("OnEvent", function(_, event, ...)
         if ns.db.welcome and not firstTime then
             local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
             local ok, v = pcall(get, ADDON, "Version")
-            print(string.format("|TInterface\\AddOns\\RubberDucky\\Media\\bobber_duck:14:14|t |cffffd100Rubber Ducky|r %sis ready. Type |cffffd100/ducky|r for settings.",
+            ns.Chat(string.format("Quack! %sis ready to fish. Type |cffffd100/ducky|r for settings.",
                 ok and v and ("v" .. v .. " ") or ""))
         end
 
@@ -412,12 +422,13 @@ end)
 -------------------------------------------------------------------------------
 
 local function Help()
-    print("|cffffd100Rubber Ducky|r commands:")
+    ns.Chat("here's what I can do:")
     print("  /ducky               open settings")
     print("  /ducky test          preview the sparkle and bobber icon")
     print("  /ducky icons         pick your bobber icon from a grid")
     print("  /ducky focus | sparkle | marker | camera | onekey   turn a feature on or off")
-    print("  /ducky pole          swap between your fishing pole and weapons")
+    print("  /ducky swap          swap between your fishing pole and weapon")
+    print("  /ducky swap 1 | 2    put on your pole (1) or weapon (2)")
     print("  /ducky welcome       show the welcome screen again")
     print("  /ducky restore       put your sound, camera and soft-target settings back now")
     -- developer commands (debug, console, button, probe, log, mark) aren't listed
@@ -447,8 +458,11 @@ SlashCmdList.RUBBERDUCKY = function(msg)
         if ns.OneKey then ns.OneKey:Update() end
     elseif msg == "icons" then
         if ns.Picker then ns.Picker:Toggle() end
-    elseif msg == "pole" then
-        if ns.Gear then ns.Gear:Swap() end
+    elseif msg:match("^swap") then
+        local target = msg:match("^swap%s+(%w+)")
+        if target == "1" then target = "pole"
+        elseif target == "2" or target == "wep" then target = "weapon" end
+        if ns.Gear then ns.Gear:Swap(target) end
     elseif msg == "welcome" then
         if ns.Welcome then ns.Welcome:Show() end
     elseif msg == "debug" then

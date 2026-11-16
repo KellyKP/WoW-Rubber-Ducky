@@ -2,7 +2,7 @@
 ## Title: |cffffd100Rubber Ducky|r
 ## Notes: Your little fishing buddy.
 ## Author: Rubber Ducky
-## Version: 0.21.0
+## Version: 0.22.0
 ## Category: Professions
 ## Category-enUS: Professions
 ## X-License: MIT
@@ -22,3 +22,5 @@ Splash.lua
 UI.lua
 Options.lua
 Welcome.lua
+Changelog.lua
+Share.lua

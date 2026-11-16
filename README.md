@@ -14,7 +14,9 @@ Rubber Ducky makes fishing easier on the ears and eyes. It hushes the world so t
 - **One-button fishing.** With a pole equipped, one button casts and reels in. You can use Interact, or the left or right trigger on a controller. The button goes back to normal when you take the pole off or combat starts.
 - **Auto loot.** Your catch goes straight to your bags, whichever button reeled it in. It doesn't change the game's own auto-loot setting.
 - **Catch splash.** A banner slams onto the screen with what you caught, and each item's rarity colours its line. Misses get a splash too: "Missed!" when you reel in empty, and "Zzz..." when the cast runs out.
-- **Pole swap.** Drag the Pole swap icon onto any action bar or crossbar slot. One press puts your fishing pole on, and the next puts back the weapon you had before. It works in combat.
+- **Pole swap.** Drag the Pole swap icon onto any action bar or crossbar slot. One press puts your fishing pole on, and the next puts back the weapon you had before, each with its own splash and sound.
+
+- **Share settings.** Copy your settings as text to share your setup, or paste a friend's. It's on the overview page.
 
 ## Install
 
@@ -30,7 +32,8 @@ The first time you log in, a welcome screen helps you set things up. After that,
 |---|---|
 | `/ducky` | Open the settings |
 | `/ducky icons` | Pick your bobber icon |
-| `/ducky pole` | Swap between your fishing pole and your weapon (out of combat) |
+| `/ducky swap` | Swap between your fishing pole and your weapon, out of combat (what the Ducky Pole macro runs) |
+| `/ducky swap 1`, `/ducky swap 2` | Put on your pole (1) or your weapon (2). `pole` and `weapon` work too |
 | `/ducky test` | Preview the sparkle and bobber icon |
 | `/ducky focus`, `sparkle`, `marker`, `camera`, `onekey` | Turn a feature on or off |
 | `/ducky welcome` | Show the welcome screen again |
@@ -46,7 +49,9 @@ The first time you log in, a welcome screen helps you set things up. After that,
 
 ## Reporting a bug
 
-Open the **Developer** page in the settings and switch on debug mode. A small console window appears. Do whatever causes the problem, then press **Copy** in the console and paste the text into your issue. For fishing problems, also tick **Event recorder** under Developer and fish once. Then send its log, which opens with **Show log** under Developer or `/ducky log`.
+The quickest help: turn on **Include debug info when copying settings** on the Developer page, then press **Copy my settings** on the overview page and paste the text into your issue. It lists your settings, game details and other addons.
+
+For more detail, open the **Developer** page in the settings and switch on debug mode. A small console window appears. Do whatever causes the problem, then press **Copy** in the console and paste the text into your issue. For fishing problems, also tick **Event recorder** under Developer and fish once. Then send its log, which opens with **Show log** under Developer or `/ducky log`.
 
 ## Credits
 

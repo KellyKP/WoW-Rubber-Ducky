@@ -34,6 +34,7 @@ end
 
 local function Choose(value)
     ns.db.markerStyle = value
+    ns.db.markerEnabled = true -- picking a bobber means you want to see it
     SyncSetting(value)
     if ns.Bobber.RefreshMarker then ns.Bobber:RefreshMarker() end
     if ns.Options and ns.Options.RefreshOverview then ns.Options.RefreshOverview() end

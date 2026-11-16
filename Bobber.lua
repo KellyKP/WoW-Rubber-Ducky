@@ -197,13 +197,16 @@ local function ShowMarker(anchor, relPoint, yOff)
     float:Play()
 end
 
-function Bobber:RefreshMarker()
-    if marker:IsShown() then PickMarker() end
-end
-
 local function HideMarker()
     marker:Hide(); float:Stop(); pop:Stop()
     marker:ClearAllPoints()
+end
+
+-- icon picked or switched on/off: show the change on the live bobber too
+function Bobber:RefreshMarker()
+    if not ns.db.markerEnabled then HideMarker() return end
+    if marker:IsShown() then PickMarker()
+    elseif ns.fishing and self.Attach then self:Attach() end
 end
 
 -------------------------------------------------------------------------------
