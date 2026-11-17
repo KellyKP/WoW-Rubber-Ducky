@@ -2,12 +2,12 @@
 ## Title: |cffffd100Rubber Ducky|r
 ## Notes: Your little fishing buddy.
 ## Author: Rubber Ducky
-## Version: 0.22.0
+## Version: 0.23.0
 ## Category: Professions
 ## Category-enUS: Professions
 ## X-License: MIT
 ## SavedVariables: RubberDuckyDB
-## IconTexture: Interface\AddOns\RubberDucky\Media\bobber_duck
+## IconTexture: Interface\AddOns\RubberDucky\Media\Bobbers\duck
 
 Core.lua
 Console.lua
@@ -19,6 +19,8 @@ Gear.lua
 Probe.lua
 Picker.lua
 Splash.lua
+Log.lua
+Menu.lua
 UI.lua
 Options.lua
 Welcome.lua

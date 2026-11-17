@@ -9,11 +9,10 @@ local category
 local pages = {}
 Options.pages = pages
 
-local MEDIA = "Interface\\AddOns\\RubberDucky\\Media\\"
 local function BobberTexture(style)
     local list = ns.Bobber.MARKERS
     if not style or style < 1 or style > #list then style = 1 end
-    return MEDIA .. "bobber_" .. list[style][1], list[style][2]
+    return ns.BobberArt(list[style][1]), list[style][2]
 end
 
 local function pct(v) return string.format("%d%%", v * 100 + 0.5) end
@@ -97,26 +96,26 @@ end
 local function OverviewPage()
     local p = UI.NewPage{ title = "|cffffd100Rubber Ducky|r", subtitle = "Version " .. Version() .. "  ·  for WoW: Forever",
         icon = BobberTexture(1), crop = false }
+    -- share your setup with a friend, or send it along when asking for help
+    p:Tool("Copy settings", function() ns.Share:ShowCopy() end)
+    p:Tool("Paste settings", function() ns.Share:ShowPaste() end)
+
     local c = p:Card("What it does")
+    Feature(c, "Interface\\Icons\\INV_Fishingpole_01", "Pole swap", "One button swaps your fishing pole and your weapon.")
     Feature(c, "Interface\\Icons\\INV_Misc_Drum_01", "Sound", "Effects up, everything else to a mumble, so the splash stands out.")
-    Feature(c, MEDIA .. "bobber_glowlantern", "Bobber", "Sparkles and your choice of 24 bobber icons mark where it landed.", false)
     Feature(c, "Interface\\Icons\\INV_Misc_Spyglass_03", "Camera", "Eases in toward the water while you fish, back out when you loot.")
-    Feature(c, "Interface\\Icons\\INV_Fishingpole_02", "One-button fishing", "One button casts and reels in; your catch lands in your bags with a splash.")
+    Feature(c, ns.BobberArt("glowlantern"), "Bobber", "Sparkles and your choice of 24 bobber icons mark where it landed.", false)
+    Feature(c, "Interface\\Icons\\INV_Fishingpole_02", "One-button fishing", "One button casts and reels in.")
+    Feature(c, "Interface\\Icons\\INV_Misc_Fish_02", "Your catch", "Straight to your bags, with a splash to celebrate.")
+    Feature(c, ns.MEDIA .. "Log\\button", "Fishing log", "Everything you caught this session, written on a parchment board.", false)
     c:Advance(4)
     c:Text("Pick a section on the left to change its settings.", true)
-    c:Buttons{ { "What's new", function() ns.Changelog:Show() end, width = 140 } }
+    c:Buttons{ { "What's new", function() ns.Changelog:Show() end, width = 140 },
+        { "Welcome screen", function() ns.Welcome:Show() end, width = 150 } }
 
-    AddPoleSwapCard(p)
-
-    local share = p:Card("Share settings")
-    share:Text("Share your setup with a friend, or send it along when asking for help.", true)
-    share:Buttons{ { "Copy my settings", function() ns.Share:ShowCopy() end, width = 160 },
-        { "Paste settings", function() ns.Share:ShowPaste() end, width = 160 } }
-
-    local hello = p:Card("Welcome")
+    local hello = p:Card("Hello")
     hello:Toggle{ label = "Say hello in chat when you log in", key = "welcome",
-        desc = "One line with the version and the /ducky command." }
-    hello:Buttons{ { "Show welcome screen", function() ns.Welcome:Show() end, width = 180 } }
+        desc = "One line with the version, and what's new after an update." }
     p:OnRefresh(function(page)
         local style = ns.db.markerStyle or 1
         if style < 1 then style = math.random(#ns.Bobber.MARKERS) end
@@ -159,6 +158,7 @@ local function SoundPage()
     fine:Slider{ label = "Fade in", key = "fadeIn", min = 0, max = 5, step = 0.25, format = secs }
     fine:Slider{ label = "Fade out", key = "fadeOut", min = 0, max = 8, step = 0.25, format = secs }
     p:Expander("Fine-tune", fine)
+    p:ResetTool()
     return p
 end
 
@@ -166,8 +166,10 @@ end
 -- Bobber
 -------------------------------------------------------------------------------
 local function BobberPage()
-    local p = UI.NewPage{ title = "Bobber", subtitle = "Spot your bobber at a glance.", icon = BobberTexture(1), crop = false }
     local function marker() if ns.Bobber.RefreshMarker then ns.Bobber:RefreshMarker() end end
+    -- the page switch is the icon above your bobber; sparkles have their own
+    local p = UI.NewPage{ title = "Bobber", subtitle = "Spot your bobber at a glance.", icon = BobberTexture(1), crop = false,
+        toggleKey = "markerEnabled", onToggle = marker }
     local function sparkle() if ns.Bobber.RefreshSparkle then ns.Bobber:RefreshSparkle() end end
 
     local mine = p:Card("Your bobber")
@@ -205,9 +207,9 @@ local function BobberPage()
         page.icon:SetTexture(tex)
     end)
 
-    local icon = p:Card("Icon")
-    icon:Toggle{ label = "Show the icon above your bobber", key = "markerEnabled", onChange = marker }
-    icon:Choice{ label = "Size", options = { { 40, "Small" }, { 56, "Medium" }, { 80, "Large" } }, key = "markerSize",
+    mine:Choice{ label = "Size", options = { { 40, "Small" }, { 56, "Medium" }, { 80, "Large" } }, key = "markerSize",
+        onChange = marker, maxWidth = 110 }
+    mine:Choice{ label = "Height", options = { { -20, "Low" }, { 20, "Medium" }, { 60, "High" } }, key = "markerOffsetY",
         onChange = marker, maxWidth = 110 }
 
     local sp = p:Card("Sparkles")
@@ -223,6 +225,7 @@ local function BobberPage()
     fine:Slider{ label = "Sparkle height", key = "sparkleOffsetY", min = -80, max = 40, step = 2, format = function(v) return v .. " px" end, onChange = sparkle }
     fine:Slider{ label = "Sparkle spread", key = "sparkleSpread", min = 40, max = 200, step = 5, format = function(v) return v .. " px" end, onChange = sparkle }
     p:Expander("Fine-tune position", fine)
+    p:ResetTool{ apply = function() marker(); sparkle() end, extra = { "markerStyle" } }
     return p
 end
 
@@ -250,6 +253,7 @@ local function CameraPage()
     fine:Slider{ label = "View (character height)", key = "cameraTilt", min = 0, max = 0.4, step = 0.01, format = function(v) return string.format("%.2f", v) end, onChange = reapply }
     fine:Slider{ label = "Sideways", key = "cameraShoulder", min = -3, max = 3, step = 0.25, format = function(v) return string.format("%.2f", v) end, onChange = reapply }
     p:Expander("Fine-tune", fine)
+    p:ResetTool{ apply = reapply }
     return p
 end
 
@@ -273,7 +277,7 @@ local function AddSplashCards(p)
         t:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
         t.tex = t:CreateTexture(nil, "ARTWORK")
         t.tex:SetPoint("TOPLEFT", 2, -2); t.tex:SetPoint("BOTTOMRIGHT", -2, 2)
-        t.tex:SetTexture(MEDIA .. "splash_" .. b[1])
+        t.tex:SetTexture(ns.SplashArt("Catch", b[1]))
         local hl = t:CreateTexture(nil, "HIGHLIGHT")
         hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.06)
         t:SetScript("OnClick", function()
@@ -323,31 +327,173 @@ end
 -------------------------------------------------------------------------------
 -- One-button fishing
 -------------------------------------------------------------------------------
+local bindHelp, ShowBindHelp
+local BIND_STEPS = {
+    "Press |cffffd200Esc|r, then pick |cffffd200Options|r.",
+    "Under |cffffd200Gameplay|r, pick |cffffd200Controls|r.",
+    "Find |cffffd200Interact With Target|r, click the first box next to it, and press the key you want.",
+}
+function ShowBindHelp()
+    if bindHelp then bindHelp:Show() return end
+    local w = CreateFrame("Frame", "RubberDuckyBindHelp", UIParent, "BackdropTemplate")
+    bindHelp = w
+    w:SetSize(400, 250)
+    w:SetPoint("CENTER")
+    w:SetFrameStrata("FULLSCREEN_DIALOG")
+    w:SetMovable(true); w:EnableMouse(true); w:SetClampedToScreen(true)
+    w:RegisterForDrag("LeftButton")
+    w:SetScript("OnDragStart", w.StartMoving)
+    w:SetScript("OnDragStop", w.StopMovingOrSizing)
+    w:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 24,
+        insets = { left = 6, right = 6, top = 6, bottom = 6 },
+    })
+    tinsert(UISpecialFrames, "RubberDuckyBindHelp")
+    local title = w:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    title:SetPoint("TOP", 0, -16)
+    title:SetText("|T" .. ns.DUCK .. ":18:18|t  Binding the Interact key")
+    local close = CreateFrame("Button", nil, w, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", -4, -4)
+    local y = -48
+    local function Line(text, font, indent)
+        local fs = w:CreateFontString(nil, "OVERLAY", font or "GameFontHighlight")
+        fs:SetPoint("TOPLEFT", 22 + (indent or 0), y)
+        fs:SetWidth(356 - (indent or 0)); fs:SetJustifyH("LEFT")
+        fs:SetText(text)
+        y = y - (fs:GetStringHeight() or 14) - 8
+    end
+    for i, step in ipairs(BIND_STEPS) do Line(i .. ".  " .. step) end
+    y = y - 4
+    Line("\"Enable Interact Key\" isn't needed: Rubber Ducky turns on what it needs while you fish. "
+        .. "Turn it on if you also want the key for NPCs, mail and so on.", "GameFontDisableSmall")
+    Line("No key handy? Pick a controller trigger instead: it works without any binding.", "GameFontDisableSmall")
+end
+
 local function OneButtonPage()
     local update = function() ns.OneKey:Update() end
     local p = UI.NewPage{ title = "One-button fishing", subtitle = "With a pole equipped, one button casts and reels in.",
         icon = "Interface\\Icons\\INV_Fishingpole_02", toggleKey = "oneKeyEnabled", onToggle = update }
 
     local c = p:Card("Your button")
+    local OK = ns.OneKey
     c:Choice{ tall = true, key = "oneKeyButton", onChange = update, options = function()
-        local T = ns.OneKey.TriggerName
         return {
-            { 4, "Interact", "casts when nothing's targeted" },
-            { 6, T("left"), "casts, then reels in" },
-            { 5, T("right"), "casts, then reels in" },
+            { 4, "Interact", (OK.Binding(4)) },
+            { 6, OK.TriggerName("left"), (OK.Binding(6)) },
+            { 5, OK.TriggerName("right"), (OK.Binding(5)) },
         }
     end }
+    c:Text("Interact casts when nothing's targeted. The triggers cast, then reel in.", true)
+    local noteY = c.y
     c:Text("Your button works normally again when you equip your weapon or combat starts.", true)
+    local help = CreateFrame("Button", nil, c.frame)
+    help:SetSize(130, 16)
+    help.bindHelpLink = true
+    help:SetPoint("TOPRIGHT", c.frame, "TOPRIGHT", -14, noteY + 1)
+    help.text = help:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    help.text:SetPoint("RIGHT")
+    help.text:SetText("How do I bind it?")
+    help:SetScript("OnEnter", function() help.text:SetTextColor(1, 1, 1) end)
+    help:SetScript("OnLeave", function() help.text:SetTextColor(1, 0.82, 0) end)
+    help:SetScript("OnClick", function() UI.Later(ShowBindHelp) end)
+    p:OnRefresh(function()
+        local _, works = OK.Binding(ns.db.oneKeyButton or 4)
+        help:SetShown(not works)
+    end)
+    -- bindings and controllers can change while the page is open
+    local watch = CreateFrame("Frame")
+    for _, e in ipairs({ "UPDATE_BINDINGS", "CVAR_UPDATE", "GAME_PAD_CONNECTED", "GAME_PAD_DISCONNECTED" }) do
+        pcall(watch.RegisterEvent, watch, e)
+    end
+    watch:SetScript("OnEvent", function()
+        if p.frame and p.frame:IsVisible() then UI.Later(function() p:Refresh() end) end
+    end)
 
     local ctl = p:Card("Controller")
     ctl:Choice{ label = "Controller type", key = "padType",
         options = { { "auto", "Automatic" }, { "xbox", "Xbox" }, { "playstation", "PlayStation" }, { "switch", "Switch" } } }
 
+    p:ResetTool{ apply = update }
+    return p
+end
+
+-------------------------------------------------------------------------------
+-- Pole swap
+-------------------------------------------------------------------------------
+local function PoleSwapPage()
+    local p = UI.NewPage{ title = "Pole swap", subtitle = "One button swaps your fishing pole and your weapon.",
+        icon = "Interface\\Icons\\INV_Fishingpole_01" }
+    AddPoleSwapCard(p)
+    p:ResetTool()
+    return p
+end
+
+-------------------------------------------------------------------------------
+-- Your catch
+-------------------------------------------------------------------------------
+local function CatchPage()
+    local p = UI.NewPage{ title = "Your catch", subtitle = "Straight to your bags, with a splash to celebrate.",
+        icon = "Interface\\Icons\\INV_Misc_Fish_02" }
     local loot = p:Card("Looting")
     loot:Toggle{ label = "Auto loot your catch", key = "autoLootFishing",
         desc = "Your catch goes straight to your bags." }
-
     AddSplashCards(p)
+    p:ResetTool{ extra = { "splashBanner" } }
+    return p
+end
+
+-------------------------------------------------------------------------------
+-- Fishing log
+-------------------------------------------------------------------------------
+local function LogPage()
+    local p = UI.NewPage{ title = "Fishing log", subtitle = "Everything you caught this session.",
+        icon = "Interface\\Icons\\INV_Misc_Note_01", toggleKey = "logEnabled",
+        onToggle = function() ns.Log:Apply() end }
+
+    local c = p:Card("The log")
+    c:Toggle{ label = "Open when you equip a fishing pole", key = "logAutoOpen",
+        desc = "It goes away when the pole comes off. The X closes it until next time." }
+    c:Choice{ label = "Size", options = { { 0.8, "Small" }, { 1, "Medium" }, { 1.25, "Large" } }, key = "logScale",
+        onChange = function() ns.Log:Apply() end, maxWidth = 110 }
+    c:Buttons{ { "Open the log", function() ns.Log:Show() end, width = 140 },
+        { "Start a new session", function() ns.Log:NewSession() end, width = 170 } }
+    c:Text("Drag the board to move it. The reset icon up top puts it back.", true)
+
+    local m = p:Card("Opening the log yourself")
+    m:Toggle{ label = "Show a log button", key = "logButton", onChange = function() ns.Log:ApplyButton() end,
+        desc = "Opens and closes the log. Drag it anywhere, right-click it to lock it in place." }
+    local y = m:Advance(52)
+    local icon = CreateFrame("Button", nil, m.frame)
+    icon:SetSize(40, 40)
+    icon:SetPoint("TOPLEFT", 14, y)
+    icon.tex = icon:CreateTexture(nil, "ARTWORK")
+    icon.tex:SetAllPoints()
+    icon.tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    icon.tex:SetTexture(ns.Log.MACRO_ICON)
+    local hl = icon:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints(); hl:SetTexture("Interface\\Buttons\\ButtonHilight-Square"); hl:SetBlendMode("ADD")
+    icon:RegisterForDrag("LeftButton")
+    icon:SetScript("OnDragStart", function() ns.Log:PickupMacro() end)
+    icon:SetScript("OnClick", function() ns.Log:PickupMacro() end)
+    local head = m.frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    head:SetPoint("TOPLEFT", icon, "TOPRIGHT", 12, -2)
+    head:SetText("Or drag this onto an action bar")
+    local sub = m.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    sub:SetPoint("TOPLEFT", head, "BOTTOMLEFT", 0, -6)
+    sub:SetText("A macro that opens and closes the log, handy on a controller.")
+
+    local fine = p:Card("Exact sizes")
+    fine:Slider{ label = "Log size", key = "logScale", min = 0.5, max = 1.6, step = 0.05, format = pct,
+        onChange = function() ns.Log:Apply() end }
+    fine:Slider{ label = "Button size", key = "logButtonSize", min = 24, max = 80, step = 2,
+        format = function(v) return v .. " px" end, onChange = function() ns.Log:ApplyButton() end }
+    p:Expander("Fine-tune", fine)
+    p:ResetTool{ apply = function() ns.Log:Apply() end, extra = { "logButtonLocked" }, positions = {
+        { "Reset log position", function() ns.Log:ResetPosition() end },
+        { "Reset button position", function() ns.Log:ResetButton() end },
+    } }
     return p
 end
 
@@ -387,8 +533,10 @@ local function Build()
     category = Settings.RegisterCanvasLayoutCategory(pages.overview.frame, "Rubber Ducky")
     Settings.RegisterAddOnCategory(category)
     local list = {
-        { "sound", "Sound", SoundPage }, { "bobber", "Bobber", BobberPage }, { "camera", "Camera", CameraPage },
-        { "onebutton", "One-button fishing", OneButtonPage }, { "developer", "Developer", DeveloperPage },
+        { "poleswap", "Pole swap", PoleSwapPage }, { "sound", "Sound", SoundPage }, { "camera", "Camera", CameraPage },
+        { "bobber", "Bobber", BobberPage }, { "onebutton", "One-button fishing", OneButtonPage },
+        { "catch", "Your catch", CatchPage }, { "log", "Fishing log", LogPage },
+        { "developer", "Developer", DeveloperPage },
     }
     for _, item in ipairs(list) do
         local page = item[3]()

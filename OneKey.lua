@@ -100,6 +100,39 @@ function OK.TriggerName(side)
     return NAMES[OK.PadType()][side]
 end
 
+-- For the settings: what a button choice is bound to, and whether it can work.
+local ICON_STYLE = { xbox = "Ltr", playstation = "Shp", switch = "Rev" }
+local function TriggerIcon(side)
+    local style = ICON_STYLE[OK.PadType()]
+    local name = side == "left" and "LTrigger" or "RTrigger"
+    if C_Texture and C_Texture.GetAtlasInfo then
+        for _, size in ipairs({ "_64", "_32", "" }) do
+            local atlas = "Gamepad_" .. style .. "_" .. name .. size
+            local ok, info = pcall(C_Texture.GetAtlasInfo, atlas)
+            if ok and info then return "|A:" .. atlas .. ":18:18|a" end
+        end
+    end
+    return "[" .. OK.TriggerName(side) .. "]"
+end
+local function KeyText(key)
+    local t = GetBindingText and GetBindingText(key) or key
+    return "[" .. (t or key):gsub("Mouse Button ", "Mouse ") .. "]"
+end
+function OK.Binding(mode)
+    if mode == 4 then
+        local a, b = GetBindingKey("INTERACTTARGET")
+        local parts = {}
+        if a and a ~= "" then parts[#parts + 1] = KeyText(a) end
+        if b and b ~= "" and b ~= a then parts[#parts + 1] = KeyText(b) end
+        if #parts > 0 then return table.concat(parts, " "), true end
+        if GamepadOn() then return "uses " .. TriggerIcon("right"), true end
+        return "[Not Bound]", false
+    end
+    local side = mode == 6 and "left" or "right"
+    if GamepadOn() then return TriggerIcon(side), true end
+    return "[No controller]", false
+end
+
 -- returns the keys, and whether they're interact keys (cast only when idle)
 local function Keys()
     local mode = ns.db.oneKeyButton or 4

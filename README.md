@@ -14,6 +14,7 @@ Rubber Ducky makes fishing easier on the ears and eyes. It hushes the world so t
 - **One-button fishing.** With a pole equipped, one button casts and reels in. You can use Interact, or the left or right trigger on a controller. The button goes back to normal when you take the pole off or combat starts.
 - **Auto loot.** Your catch goes straight to your bags, whichever button reeled it in. It doesn't change the game's own auto-loot setting.
 - **Catch splash.** A banner slams onto the screen with what you caught, and each item's rarity colours its line. Misses get a splash too: "Missed!" when you reel in empty, and "Zzz..." when the cast runs out.
+- **Fishing log.** Everything you caught this session on a parchment board: how many, what it was, and a cute note, both written in the catch's rarity colour. It opens when you equip a fishing pole and closes when you put it away, can be dragged anywhere, and pages when you've caught more than six kinds of thing. An optional log button brings it up any time; right-click it to lock it in place.
 - **Pole swap.** Drag the Pole swap icon onto any action bar or crossbar slot. One press puts your fishing pole on, and the next puts back the weapon you had before, each with its own splash and sound.
 
 - **Share settings.** Copy your settings as text to share your setup, or paste a friend's. It's on the overview page.
@@ -28,12 +29,15 @@ The first time you log in, a welcome screen helps you set things up. After that,
 
 ## Commands
 
+You can also click **Rubber Ducky** in the minimap's AddOns list for a menu with the fishing log and settings.
+
 | Command | What it does |
 |---|---|
 | `/ducky` | Open the settings |
 | `/ducky icons` | Pick your bobber icon |
 | `/ducky swap` | Swap between your fishing pole and your weapon, out of combat (what the Ducky Pole macro runs) |
 | `/ducky swap 1`, `/ducky swap 2` | Put on your pole (1) or your weapon (2). `pole` and `weapon` work too |
+| `/ducky log` | Open or close the fishing log |
 | `/ducky test` | Preview the sparkle and bobber icon |
 | `/ducky focus`, `sparkle`, `marker`, `camera`, `onekey` | Turn a feature on or off |
 | `/ducky welcome` | Show the welcome screen again |
@@ -51,11 +55,13 @@ The first time you log in, a welcome screen helps you set things up. After that,
 
 The quickest help: turn on **Include debug info when copying settings** on the Developer page, then press **Copy my settings** on the overview page and paste the text into your issue. It lists your settings, game details and other addons.
 
-For more detail, open the **Developer** page in the settings and switch on debug mode. A small console window appears. Do whatever causes the problem, then press **Copy** in the console and paste the text into your issue. For fishing problems, also tick **Event recorder** under Developer and fish once. Then send its log, which opens with **Show log** under Developer or `/ducky log`.
+For more detail, open the **Developer** page in the settings and switch on debug mode. A small console window appears. Do whatever causes the problem, then press **Copy** in the console and paste the text into your issue. For fishing problems, also tick **Event recorder** under Developer and fish once. Then send its log, which opens with **Show log** under Developer or `/ducky events`.
 
 ## Credits
 
 The camera and one-button approaches follow [Improved Forever](https://www.curseforge.com/wow/addons/improved-forever) (MIT), which showed what Forever allows.
+
+The handwriting in the fishing log is [Patrick Hand](https://fonts.google.com/specimen/Patrick+Hand) by Patrick Wagesreiter, under the SIL Open Font License (`Media/Fonts/OFL.txt`).
 
 ## License
 

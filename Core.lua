@@ -22,7 +22,7 @@ ns.defaults = {
     markerEnabled  = true,
     markerStyle    = 15,    -- 0 = random each cast, else index into Bobber.MARKERS (15 = duck)
     markerSize     = 56,
-    markerOffsetY  = 20,
+    markerOffsetY  = -20,   -- Low; Medium 20, High 60
 
     -- Camera
     cameraEnabled      = true,
@@ -46,6 +46,14 @@ ns.defaults = {
     splashCatchSound = true,
     splashMisses     = true,
     splashMissSound  = true,
+
+    -- Fishing log
+    logEnabled  = true,
+    logAutoOpen = true,   -- opens when a fishing pole goes on (it always closes when the pole comes off)
+    logScale    = 1,
+    logButton   = false,  -- a little button that opens and closes the log
+    logButtonLocked = false, -- right-click the button to lock it in place
+    logButtonSize   = 40,    -- about an action button
 
     -- Pole swap
     swapSplash = true,
@@ -72,8 +80,14 @@ ns.castStart = 0
 -- Helpers
 -------------------------------------------------------------------------------
 
+-- Art lives in Media\<kind>\; these build the paths.
+ns.MEDIA = "Interface\\AddOns\\RubberDucky\\Media\\"
+function ns.BobberArt(key) return ns.MEDIA .. "Bobbers\\" .. key end
+function ns.SplashArt(kind, key) return ns.MEDIA .. "Splash\\" .. kind .. "\\" .. key end -- kind: Catch, Miss, Swap
+ns.DUCK = ns.BobberArt("duck")
+
 -- The few messages meant for chat: duck icon + name in front.
-local CHAT_PREFIX = "|TInterface\\AddOns\\RubberDucky\\Media\\bobber_duck:14:14|t |cffffd100Rubber Ducky:|r "
+local CHAT_PREFIX = "|T" .. ns.DUCK .. ":14:14|t |cffffd100Rubber Ducky:|r "
 function ns.Chat(msg) print(CHAT_PREFIX .. msg) end
 
 -- Status messages go to the debug console, never to chat.
@@ -352,11 +366,19 @@ EVENTS:SetScript("OnEvent", function(_, event, ...)
         if ns.Options then ns.Options:Build() end
         if ns.Console then ns.Console:Apply() end
         local firstTime = ns.Welcome and ns.Welcome:MaybeShowFirstTime()
+        local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+        local ok, v = pcall(get, ADDON, "Version")
+        v = ok and v or nil
+        -- the first login after an update says so, once (if you like the hello)
+        local updated = v and not firstTime and ns.db.lastVersion ~= v
+        if v then ns.db.lastVersion = v end
         if ns.db.welcome and not firstTime then
-            local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
-            local ok, v = pcall(get, ADDON, "Version")
-            ns.Chat(string.format("Quack! %sis ready to fish. Type |cffffd100/ducky|r for settings.",
-                ok and v and ("v" .. v .. " ") or ""))
+            if updated then
+                ns.Chat(string.format("Quack! Updated to v%s. See what's new: type |cffffd100/ducky|r, then press What's new.", v))
+            else
+                ns.Chat(string.format("Quack! %sis ready to fish. Type |cffffd100/ducky|r for settings.",
+                    v and ("v" .. v .. " ") or ""))
+            end
         end
 
     elseif event == "PLAYER_LOGOUT" then
@@ -402,7 +424,14 @@ EVENTS:SetScript("OnEvent", function(_, event, ...)
 
     elseif event == "LOOT_READY" or event == "LOOT_OPENED" then
         local fromFishing = FromFishing()
-        if fromFishing then ns.lastLootAt = GetTime() end
+        if fromFishing then
+            ns.lastLootAt = GetTime()
+            -- read the catch before auto loot takes it
+            if ns.Log and ns.Splash then
+                local ok, items = pcall(ns.Splash.ReadLoot)
+                if ok then ns.Safe(ns.Log.Add, ns.Log, items) end
+            end
+        end
         -- LOOT_READY's argument: the game is already auto-looting
         if event == "LOOT_READY" then ns:LootCatch((...)) end
         -- once per catch, on whichever loot event comes first
@@ -429,9 +458,10 @@ local function Help()
     print("  /ducky focus | sparkle | marker | camera | onekey   turn a feature on or off")
     print("  /ducky swap          swap between your fishing pole and weapon")
     print("  /ducky swap 1 | 2    put on your pole (1) or weapon (2)")
+    print("  /ducky log           open or close the fishing log")
     print("  /ducky welcome       show the welcome screen again")
     print("  /ducky restore       put your sound, camera and soft-target settings back now")
-    -- developer commands (debug, console, button, probe, log, mark) aren't listed
+    -- developer commands (debug, console, button, probe, events, mark) aren't listed
 end
 
 local function Toggle(key, label)
@@ -474,9 +504,11 @@ SlashCmdList.RUBBERDUCKY = function(msg)
         Toggle("probeEnabled", "Event recorder")
         if ns.db.probeEnabled then
             if not ns.db.debugMode then ns.Print("the event recorder only runs in debug mode (/ducky debug).") end
-            ns.Print("Cast a few times (/ducky mark notes a moment), then /ducky log.")
+            ns.Print("Cast a few times (/ducky mark notes a moment), then /ducky events.")
         end
     elseif msg == "log" then
+        if ns.Log then ns.Log:Toggle(true) end
+    elseif msg == "events" then
         if ns.Probe then ns.Probe:ShowLog() end
     elseif msg == "mark" then
         if ns.Probe then ns.Probe:Mark("you marked this moment") end

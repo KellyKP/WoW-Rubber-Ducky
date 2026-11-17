@@ -73,7 +73,7 @@ function Probe:OnCastStop(reason)
         ns.db.probeLogs = ns.db.probeLogs or {}
         table.insert(ns.db.probeLogs, 1, lines)
         while #ns.db.probeLogs > MAX_CASTS do table.remove(ns.db.probeLogs) end
-        ns.Print("recorded cast (%d lines). /ducky log to view.", #lines)
+        ns.Print("recorded cast (%d lines). /ducky events to view.", #lines)
     end)
 end
 

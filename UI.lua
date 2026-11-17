@@ -8,6 +8,8 @@
 --   card:Buttons{ {text, onClick}, ... }
 --   card:Text("...")
 --   page:Expander("Fine-tune position", card)   -- card shown on demand
+--   page:Tool("Reset position", fn)             -- small buttons, top right
+--   page:ResetTool{ apply, extra, positions }   -- reset icon: settings / positions menu
 --
 -- Changes run a frame later (UI.Later), outside Blizzard's code, to avoid taint.
 
@@ -68,7 +70,11 @@ function Card:Text(text, small)
     return fs
 end
 
+-- remember which settings a page shows, for its Defaults button
+local function Track(card, o) if o.key then card.page.keys[o.key] = true end end
+
 function Card:Toggle(o)
+    Track(self, o)
     local y = self:Advance(o.desc and 40 or 28)
     local cb = CreateFrame("CheckButton", nil, self.frame, "UICheckButtonTemplate")
     cb:SetSize(26, 26)
@@ -101,6 +107,7 @@ local function Round(v, step)
 end
 
 function Card:Slider(o)
+    Track(self, o)
     local y = self:Advance(34)
     local label = self.frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     label:SetPoint("TOPLEFT", PAD, y - 6)
@@ -155,6 +162,7 @@ end
 
 -- A row of buttons, one picked
 function Card:Choice(o)
+    Track(self, o)
     local h = o.tall and 52 or 30
     local y = self:Advance(h + 6)
     local x0 = PAD
@@ -274,7 +282,8 @@ function UI.NewPage(o)
     scroll:SetScrollChild(content)
     scroll:SetScript("OnSizeChanged", function(_, w) content:SetWidth(w) end)
 
-    local p = setmetatable({ frame = f, content = content, controls = {}, cards = {}, refreshers = {} }, Page)
+    local p = setmetatable({ frame = f, content = content, controls = {}, cards = {}, refreshers = {},
+        keys = {}, tools = {}, toggleKey = o.toggleKey }, Page)
 
     -- header: icon, title, subtitle, main switch
     local iconFrame = CreateFrame("Frame", nil, content)
@@ -306,6 +315,7 @@ function UI.NewPage(o)
         local cb = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
         cb:SetSize(28, 28)
         cb:SetPoint("TOPRIGHT", -40, -16)
+        p.toggleButton = cb
         local l = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         l:SetPoint("LEFT", cb, "RIGHT", 2, 0)
         cb:SetScript("OnClick", function(self)
@@ -323,6 +333,127 @@ function UI.NewPage(o)
     p.top = -68
     f:SetScript("OnShow", function() p:Refresh() end)
     return p
+end
+
+-- top-right tools sit in a row level with the on/off switch, to its left
+function Page:PlaceTool(b)
+    local prev = self.tools[#self.tools]
+    if prev then b:SetPoint("RIGHT", prev, "LEFT", -6, 0)
+    elseif self.toggleButton then b:SetPoint("RIGHT", self.toggleButton, "LEFT", -12, 0)
+    else b:SetPoint("RIGHT", self.content, "TOPRIGHT", -14, -30) end
+end
+
+-- small buttons in the top right
+function Page:Tool(text, fn)
+    local b = CreateFrame("Button", nil, self.content, "UIPanelButtonTemplate")
+    b:SetHeight(22)
+    b:SetText(text)
+    b:SetWidth(math.max(80, (b:GetFontString() and b:GetFontString():GetStringWidth() or 60) + 28))
+    self:PlaceTool(b)
+    b:SetScript("OnClick", function() UI.Later(function() fn(b) end) end)
+    self.tools[#self.tools + 1] = b
+    return b
+end
+
+-- A little popup menu under a button. items: { text, onClick, confirm }.
+-- confirm items ask "Sure?" first and stay open for the second click.
+local popup
+function UI.Popup(anchor, items)
+    if not popup then
+        popup = CreateFrame("Frame", "RubberDuckyPopup", UIParent, "BackdropTemplate")
+        popup:SetFrameStrata("FULLSCREEN_DIALOG")
+        popup:SetToplevel(true)
+        popup:EnableMouse(true)
+        popup:SetClampedToScreen(true)
+        popup:SetBackdrop({
+            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 16, edgeSize = 14,
+            insets = { left = 3, right = 3, top = 3, bottom = 3 },
+        })
+        popup.rows = {}
+        pcall(popup.RegisterEvent, popup, "GLOBAL_MOUSE_DOWN")
+        popup:SetScript("OnEvent", function()
+            if popup:IsShown() and not popup:IsMouseOver() and not (popup.anchor and popup.anchor:IsMouseOver()) then
+                popup:Hide()
+            end
+        end)
+        popup:Hide()
+        tinsert(UISpecialFrames, "RubberDuckyPopup")
+    end
+    if popup:IsShown() and popup.anchor == anchor then popup:Hide() return end
+    popup.anchor = anchor
+    for _, r in ipairs(popup.rows) do r:Hide() end
+    local width = 160
+    for i, item in ipairs(items) do
+        local r = popup.rows[i]
+        if not r then
+            r = CreateFrame("Button", nil, popup)
+            r:SetHeight(22)
+            r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+            r.text:SetPoint("LEFT", 8, 0)
+            local hl = r:CreateTexture(nil, "HIGHLIGHT")
+            hl:SetAllPoints(); hl:SetColorTexture(1, 0.82, 0, 0.12)
+            popup.rows[i] = r
+        end
+        r:ClearAllPoints()
+        r:SetPoint("TOPLEFT", 6, -6 - (i - 1) * 22)
+        r:SetPoint("RIGHT", popup, "RIGHT", -6, 0)
+        r.text:SetText(item[1])
+        r.text:SetTextColor(1, 1, 1)
+        local armed = false
+        r:SetScript("OnClick", function()
+            if item.confirm and not armed then
+                armed = true
+                r.text:SetText("Sure? Click again")
+                r.text:SetTextColor(1, 0.5, 0.25)
+                return
+            end
+            popup:Hide()
+            UI.Later(item[2])
+        end)
+        r:Show()
+        width = math.max(width, (r.text:GetStringWidth() or 0) + 40)
+    end
+    popup:SetSize(width, 12 + #items * 22)
+    popup:ClearAllPoints()
+    popup:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -2)
+    popup:Show()
+end
+
+-- The reset icon, top right. Its menu puts this page's settings back to the
+-- defaults (all but the page's on/off switch), and offers any position resets.
+-- o: { apply = fn after settings change, extra = { keys set by hand-made
+-- controls }, positions = { { "Reset log position", fn }, ... } }
+function Page:ResetTool(o)
+    o = o or {}
+    for _, k in ipairs(o.extra or {}) do self.keys[k] = true end
+    local b = CreateFrame("Button", nil, self.content)
+    b:SetSize(26, 26)
+    self:PlaceTool(b)
+    b:SetNormalTexture("Interface\\Buttons\\UI-RotationLeft-Button-Up")
+    b:SetPushedTexture("Interface\\Buttons\\UI-RotationLeft-Button-Down")
+    b:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    b:SetScript("OnEnter", function()
+        GameTooltip:SetOwner(b, "ANCHOR_LEFT")
+        GameTooltip:SetText("Reset")
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    local function ResetSettings()
+        for k in pairs(self.keys) do
+            if k ~= self.toggleKey and ns.defaults[k] ~= nil then ns.db[k] = ns.defaults[k] end
+        end
+        if o.apply then o.apply() end
+        self:Refresh()
+    end
+    b:SetScript("OnClick", function()
+        local items = { { "Reset settings", ResetSettings, confirm = true } }
+        for _, pos in ipairs(o.positions or {}) do items[#items + 1] = pos end
+        UI.Popup(b, items)
+    end)
+    self.tools[#self.tools + 1] = b
+    return b
 end
 
 function Page:Card(title, plain)

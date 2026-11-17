@@ -4,7 +4,6 @@ local _, ns = ...
 local Splash = {}
 ns.Splash = Splash
 
-local MEDIA = "Interface\\AddOns\\RubberDucky\\Media\\"
 Splash.BANNERS = {
     { "fishon", "Fish On!" }, { "hooked", "Hooked!" }, { "gotone", "Got One!" }, { "yoink", "Yoink!" },
 }
@@ -155,7 +154,7 @@ function Splash:Show(items)
     if not pcall(Build) or not frame then return end
     items = items or {}
     local idx = PickBanner()
-    banner:SetTexture(MEDIA .. "splash_" .. Splash.BANNERS[idx][1])
+    banner:SetTexture(ns.SplashArt("Catch", Splash.BANNERS[idx][1]))
 
     local shown = math.min(#items, MAX_ROWS)
     if #items > MAX_ROWS then shown = MAX_ROWS - 1 end
@@ -210,7 +209,10 @@ function Splash.ReadLoot()
             -- coin names already include the amount
             local isCoin = ns.Safe(GetLootSlotType, i) == (LOOT_SLOT_MONEY or 2)
             if isCoin then name = name:gsub("\n", " "); count = 0 end
-            items[#items + 1] = { icon = icon, name = name, count = tonumber(count) or 0, quality = quality }
+            local link = not isCoin and ns.Safe(GetLootSlotLink, i)
+            local id = link and ns.Safe(function() return (C_Item.GetItemInfoInstant(link)) end)
+            items[#items + 1] = { icon = icon, name = name, count = tonumber(count) or 0, quality = quality,
+                id = id, coin = isCoin or nil }
         end
     end
     return items
@@ -230,8 +232,8 @@ end
 -------------------------------------------------------------------------------
 -- art, hint, SOUNDKIT names (first one this client has)
 Splash.MISSES = {
-    timeout = { "miss_timeout", "Seems you fell asleep.", { "IG_QUEST_LOG_ABANDON_QUEST", "IG_MAINMENU_CLOSE" } },
-    missed  = { "miss_away",    "You missed that one, try again!",       { "IG_QUEST_FAILED", "IG_QUEST_LOG_ABANDON_QUEST" } },
+    timeout = { ns.SplashArt("Miss", "timeout"), "Seems you fell asleep.", { "IG_QUEST_LOG_ABANDON_QUEST", "IG_MAINMENU_CLOSE" } },
+    missed  = { ns.SplashArt("Miss", "away"), "You missed that one, try again!",       { "IG_QUEST_FAILED", "IG_QUEST_LOG_ABANDON_QUEST" } },
 }
 
 local function PlayFirst(names)
@@ -290,7 +292,7 @@ end
 local function ShowSoft(art, hint, sounds)
     if not pcall(BuildMiss) or not miss then return end
     if frame and frame:IsShown() then return end -- catch splash showing
-    miss.art:SetTexture(MEDIA .. "splash_" .. art)
+    miss.art:SetTexture(art)
     miss.sub:SetText(hint or "")
     if sounds then PlayFirst(sounds) end
     miss:SetScale(ns.db.splashSize or 0.7)
@@ -307,8 +309,8 @@ end
 
 -- Pole swap: "pole" or "weapon"
 Splash.SWAPS = {
-    pole   = { "swap_pole",   { "UI_PET_BATTLE_START", "UI_GARRISON_TOAST_FOLLOWER_GAINED", "IG_QUEST_LIST_OPEN" } },
-    weapon = { "swap_weapon", { "READY_CHECK", "RAID_WARNING" } },
+    pole   = { ns.SplashArt("Swap", "pole"), { "UI_PET_BATTLE_START", "UI_GARRISON_TOAST_FOLLOWER_GAINED", "IG_QUEST_LIST_OPEN" } },
+    weapon = { ns.SplashArt("Swap", "weapon"), { "READY_CHECK", "RAID_WARNING" } },
 }
 
 function Splash:ShowSwap(kind, preview)

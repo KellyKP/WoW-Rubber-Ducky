@@ -5,7 +5,6 @@ local Welcome = {}
 ns.Welcome = Welcome
 
 local UI = ns.UI
-local MEDIA = "Interface\\AddOns\\RubberDucky\\Media\\"
 local dialog, page
 
 local function Feature(card, icon, name, text, crop)
@@ -54,7 +53,7 @@ local function Build()
     close:SetScript("OnClick", Close)
 
     page = UI.NewPage{ title = "|cffffd100Rubber Ducky|r", subtitle = "Your little fishing buddy.",
-        icon = MEDIA .. "bobber_duck", crop = false }
+        icon = ns.DUCK, crop = false }
     page.frame:SetParent(dialog)
     page.frame:ClearAllPoints()
     page.frame:SetPoint("TOPLEFT", 10, -12)
@@ -64,7 +63,7 @@ local function Build()
     local what = page:Card("What it does")
     Feature(what, "Interface\\Icons\\INV_Misc_Drum_01", "Hear the splash",
         "Sound effects go up and everything else fades to a mumble while your line is out.")
-    Feature(what, MEDIA .. "bobber_duck", "See your bobber",
+    Feature(what, ns.DUCK, "See your bobber",
         "Sparkles and a rubber duck float over it. Pick from 24 bobbers.", false)
     Feature(what, "Interface\\Icons\\INV_Misc_Spyglass_03", "A closer look",
         "The camera eases in toward the water, then back out when you loot.")
@@ -89,9 +88,9 @@ local function Build()
         local list = ns.Bobber.MARKERS
         local style = ns.db.markerStyle or 15
         local shown = (style >= 1 and style <= #list) and style or (ns.db.lastStyle or 15)
-        bob:SetTexture(MEDIA .. "bobber_" .. list[shown][1])
+        bob:SetTexture(ns.BobberArt(list[shown][1]))
         bobName:SetText("Your bobber: |cffffd100" .. (style >= 1 and list[shown][2] or "random each cast") .. "|r")
-        pg.icon:SetTexture(MEDIA .. "bobber_" .. list[shown][1])
+        pg.icon:SetTexture(ns.BobberArt(list[shown][1]))
     end)
 
     setup:Choice{ label = "One-button fishing", key = "oneKeyButton",

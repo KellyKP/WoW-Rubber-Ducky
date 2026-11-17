@@ -5,12 +5,11 @@ local Picker = {}
 ns.Picker = Picker
 
 local COLS, CELL, GAP, PAD = 6, 60, 8, 18
-local MEDIA = "Interface\\AddOns\\RubberDucky\\Media\\bobber_"
 
 local win, cells, preview, previewName, randomCheck
 
 local function IconPath(i)
-    return MEDIA .. ns.Bobber.MARKERS[i][1]
+    return ns.BobberArt(ns.Bobber.MARKERS[i][1])
 end
 
 local function SyncSetting(value) end

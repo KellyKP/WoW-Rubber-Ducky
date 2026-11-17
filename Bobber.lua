@@ -149,7 +149,6 @@ end
 -- Marker: the bobber icon above your bobber
 -------------------------------------------------------------------------------
 
-local MEDIA = "Interface\\AddOns\\RubberDucky\\Media\\"
 Bobber.MARKERS = {
     { "classic",     "Classic Red" },   { "cork",       "Cork" },
     { "pencil",      "Pencil Float" },  { "bluestripe", "Blue Stripes" },
@@ -184,7 +183,7 @@ fadeIn:SetFromAlpha(0); fadeIn:SetToAlpha(1); fadeIn:SetDuration(0.2)
 local function PickMarker()
     local style = ns.db.markerStyle or 0
     if style < 1 or style > #Bobber.MARKERS then style = math.random(#Bobber.MARKERS) end
-    markerTex:SetTexture(MEDIA .. "bobber_" .. Bobber.MARKERS[style][1])
+    markerTex:SetTexture(ns.BobberArt(Bobber.MARKERS[style][1]))
 end
 
 local function ShowMarker(anchor, relPoint, yOff)
@@ -237,14 +236,14 @@ function Bobber:Attach()
         end
         if db.markerEnabled then
             marker:ClearAllPoints()
-            marker:SetPoint("BOTTOM", plate, "CENTER", 0, (db.sparkleOffsetY or 0) + (db.markerOffsetY or 20))
+            marker:SetPoint("BOTTOM", plate, "CENTER", 0, (db.sparkleOffsetY or 0) + (db.markerOffsetY or -20))
         end
     end)
     if ok then
         if db.sparkleEnabled then StartSparkle() end
         if db.markerEnabled then
             PickMarker()
-            ShowMarker(plate, "CENTER", (db.sparkleOffsetY or 0) + (db.markerOffsetY or 20))
+            ShowMarker(plate, "CENTER", (db.sparkleOffsetY or 0) + (db.markerOffsetY or -20))
         end
         Note("sparkle/marker anchored to " .. plateToken)
     else
@@ -309,7 +308,7 @@ function Bobber:Preview()
     if ns.db.sparkleEnabled then StartSparkle() end
     if ns.db.markerEnabled then
         PickMarker()
-        ShowMarker(sparkle, "CENTER", ns.db.markerOffsetY or 20)
+        ShowMarker(sparkle, "CENTER", ns.db.markerOffsetY or -20)
     end
     C_Timer.After(4, function() if not ns.fishing then HideSparkle(); HideMarker() end end)
 end
