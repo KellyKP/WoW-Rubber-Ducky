@@ -5,6 +5,31 @@ local Changelog = {}
 ns.Changelog = Changelog
 
 Changelog.entries = {
+    { "0.24.0", {
+        "|cffffd100New|r",
+        "Fishing journal: a leather-bound book of everything you've ever caught, one for each character. Open it from Rubber Ducky's line in the minimap's AddOns list, an optional journal button you can drag anywhere, or a \"Ducky Journal\" macro for your action bars. /ducky journal does the same.",
+        "  Catches: every fish you've caught and the ones still to find, sorted by zone, rarity, name, most caught or most recent, with a note of your own for every catch, a little map of where it bit, and a word from Ducky.",
+        "  Whosits & Whatsits: the crates, trunks, bottles, boots and skulls that come up on your line instead of a fish, with the same sorting as Catches and a filter for just treasure or just junk.",
+        "  Waters: every spot you've fished, what bites there, and the zones you've yet to discover, in the order you'd travel them.",
+        "  Records: your totals, personal bests (biggest haul, rarest catch, busiest and luckiest spots, longest session), streaks, dated firsts and how close each collection is to complete.",
+        "  The first time you open a new catch, its page is written in: the name letter by letter, then each line, then its rarity badge is stamped down.",
+        "  Find everything on Catches or Whosits & Whatsits and the page gets stamped COMPLETE!",
+        "  Ducky's Challenges: dozens of little goals, from finding all three Rumsey Rums to catching something after midnight, some hidden until you stumble on them. Finish one and a banner pops at the top of the screen. Open them from Records, Rubber Ducky's menu or `/ducky challenges`. Anything you'd already done before this update counts straight away.",
+        "  Works with a controller: the D-pad browses, the shoulder buttons flip bookmarks, the View button hops between the left and right pages, Y opens Ducky's Challenges, and a bar under the book shows the rest when the Gamepad UI is on.",
+        "First-ever catches get a \"New!\" on the catch splash and in the fishing log, with a little sparkle.",
+        "The fishing log writes in each new catch: its icon is stamped onto the page, then the words appear left to right with a quill's scratch.",
+        "Rubber Ducky has its own settings window, opened from its menu, /ducky, or the feature list on the overview page, and it goes straight to the page you want. It's still listed in the game's own AddOns settings too. It works with a controller too, as do the Welcome screen and Ducky's Challenges: the D-pad moves between settings, A picks, the shoulder buttons turn pages, and the same controls bar as the journal shows the rest.",
+        "A fresh look for every Rubber Ducky window: wood, gold and parchment, from settings and the Welcome screen to the bobber picker, What's new and Share settings. The bobber picker works with a controller too.",
+        "Six new bobbers: Froggy, Murloc, Otter, Pipi, Thrall and Jaina.",
+        "Twelve brand-new bobbers, from a Golden Duck to a Night Owl, and every bobber now has a little story in the picker.",
+        "Shiny Fishbones: now and then one comes up with your catch (always with epics and treasure), and every one of Ducky's Challenges pays some. They turn up more often by a Fishing Rack or Fishing Hut, in a Lucky Fishing Hat, at the Stranglethorn Fishing Extravaganza, or while Fellow Ducky Anglers are fishing in your zone; a little framed icon in the fishing log's corner shows when you're in luck. Challenges you'd already finished pay up the first time you log in. They show on the catch splash, in chat with the rest of your loot, in the fishing log and on Records.",
+        "Fishing flair: while your pole is out, your quarterboard hangs over your head with your name and motto on it, your bobber and charm swinging from its rivets and your guild just underneath, for your Fellow Ducky Anglers to see. Theirs show over theirs. Your own hangs off the top of the fishing log, since the game shows no name over your own head. Boards only show if you show player names, and nameplates are only touched while a Fellow Ducky Angler is fishing in your zone. Change it all on the new Fishing flair settings page.",
+        "Mrrl's Doohicky Emporium: trade your Fishbones with Mrrl for bobbers, 120 quarterboards, charms and mottos. Visit from Rubber Ducky's menu, the bobber picker, the Fishing journal settings page or /ducky shop. Give Mrrl a poke and he'll chat. It works with a controller too. The big prizes, like the Golden Duck, are still earned from Ducky's Challenges, and a bobber you're already using stays yours.",
+        "|cffffd100Changed|r",
+        "The fishing log has a new look: a hand-lettered title on the top plank, seven rows, and cattails tucked over the bottom one. When it's more than fits, scroll with the mouse wheel or the rope down its side instead of turning pages.",
+        "Smaller download: the big pictures are packed the game's own way, at a third of the size, with no difference you can see.",
+        "Pole swap gives you a heads up when the pole or weapon you're swapping to is broken, so you know to get it repaired.",
+    } },
     { "0.23.0", {
         "|cffffd100New|r",
         "Fishing log: everything you caught this session on a parchment board, each with a cute note written in its rarity colour. It opens when you equip a fishing pole and goes away when you take it off. Turn it off, resize it or stop it opening by itself on the new Fishing log settings page.",
@@ -43,7 +68,10 @@ local function Text()
         out[#out + 1] = "|cffffd100" .. e[1] .. "|r"
         for _, line in ipairs(e[2]) do
             -- a coloured line is a sub-heading (e.g. Fixes), not a bullet
-            out[#out + 1] = line:find("^|c") and ("  " .. line) or ("  •  " .. line)
+            -- two leading spaces: a point under the line above
+            if line:find("^|c") then out[#out + 1] = "  " .. line
+            elseif line:find("^  ") then out[#out + 1] = "        -  " .. line:sub(3)
+            else out[#out + 1] = "  •  " .. line end
         end
         out[#out + 1] = " "
     end
@@ -51,37 +79,21 @@ local function Text()
 end
 
 local function Build()
-    win = CreateFrame("Frame", "RubberDuckyChangelog", UIParent, "BackdropTemplate")
-    win:SetSize(520, 380)
-    win:SetPoint("CENTER")
-    win:SetFrameStrata("DIALOG")
-    win:SetMovable(true); win:EnableMouse(true); win:SetClampedToScreen(true)
-    win:RegisterForDrag("LeftButton")
-    win:SetScript("OnDragStart", win.StartMoving)
-    win:SetScript("OnDragStop", win.StopMovingOrSizing)
-    win:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 24,
-        insets = { left = 6, right = 6, top = 6, bottom = 6 },
-    })
-    tinsert(UISpecialFrames, "RubberDuckyChangelog")
-
-    local title = win:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -16)
-    title:SetText("|T" .. ns.DUCK .. ":18:18|t  What's new")
-    local close = CreateFrame("Button", nil, win, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -4, -4)
+    -- our navy frame, with its title on a plaque on the top edge
+    win = ns.SettingsWindow.Chrome("RubberDuckyChangelog", nil, { title = "What's new", frame = 0.55,
+        width = 560, height = 420, scale = 1, strata = "DIALOG" })
+    local L, T, R, B = unpack(win.inner)
 
     local scroll = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 20, -44)
-    scroll:SetPoint("BOTTOMRIGHT", -36, 18)
+    scroll:SetPoint("TOPLEFT", L + 4, -T)
+    scroll:SetPoint("BOTTOMRIGHT", -(R + 14), B)
     local body = CreateFrame("Frame", nil, scroll)
-    body:SetSize(460, 10)
+    body:SetSize(560 - L - R - 24, 10)
     scroll:SetScrollChild(body)
+    ns.UI.SlimScrollBar(scroll, win)
     local text = body:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     text:SetPoint("TOPLEFT")
-    text:SetWidth(460)
+    text:SetWidth(560 - L - R - 24)
     text:SetJustifyH("LEFT")
     text:SetSpacing(3)
     win.text, win.body = text, body

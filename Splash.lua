@@ -43,7 +43,7 @@ local function Build()
     if frame then return end
     frame = CreateFrame("Frame", "RubberDuckySplash", UIParent)
     frame:SetSize(520, 480)
-    frame:SetFrameStrata("HIGH")
+    frame:SetFrameStrata("FULLSCREEN_DIALOG") -- above our own windows, so previews show
     frame:EnableMouse(false)
     frame:Hide()
 
@@ -83,6 +83,29 @@ local function Build()
         r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         r.text = r:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
         r.text:SetShadowOffset(1, -1)
+        r.newTag = r:CreateTexture(nil, "OVERLAY")
+        r.newTag:SetTexture(ns.MEDIA .. "Journal\\new_glow")
+        r.newTag:SetSize(44, 22)
+        r.newTag:SetPoint("TOPLEFT", r.icon, "TOPLEFT", -12, 9) -- on the icon's corner
+        r.newTag:Hide()
+        -- the Shiny Fishbone's sparkle: two little stars that turn and twinkle
+        r.sparkles = {}
+        for k, spec in ipairs({ { 30, 9, 7, 1.6 }, { 18, -9, -8, 1.1 } }) do
+            local st = r:CreateTexture(nil, "OVERLAY", nil, 2)
+            st:SetTexture("Interface\\Cooldown\\star4")
+            st:SetBlendMode("ADD")
+            st:SetSize(spec[1], spec[1])
+            st:SetPoint("CENTER", r.icon, "CENTER", spec[2], spec[3])
+            local ag = st:CreateAnimationGroup()
+            local rot = ag:CreateAnimation("Rotation"); rot:SetDegrees(-90); rot:SetDuration(spec[4])
+            local a1 = ag:CreateAnimation("Alpha"); a1:SetFromAlpha(0); a1:SetToAlpha(1); a1:SetDuration(spec[4] / 2)
+            local a2 = ag:CreateAnimation("Alpha"); a2:SetFromAlpha(1); a2:SetToAlpha(0); a2:SetDuration(spec[4] / 2)
+            a2:SetStartDelay(spec[4] / 2)
+            ag:SetLooping("REPEAT")
+            st.ag = ag
+            st:Hide()
+            r.sparkles[k] = st
+        end
         r:Hide()
         rows[i] = r
     end
@@ -153,26 +176,46 @@ function Splash:Show(items)
     if not ns.db.splashEnabled then return end
     if not pcall(Build) or not frame then return end
     items = items or {}
+    -- a Shiny Fishbone that came up with this catch gets its own line, last
+    local bones = ns.Flair and ns.Flair.ThisCast()
+    if bones then
+        local copy = {}
+        for i, it in ipairs(items) do copy[i] = it end
+        copy[#copy + 1] = { icon = ns.Flair.ICON_GAME, name = bones > 1 and "Shiny Fishbones" or "Shiny Fishbone",
+            count = bones, bones = true }
+        items = copy
+    end
     local idx = PickBanner()
     banner:SetTexture(ns.SplashArt("Catch", Splash.BANNERS[idx][1]))
 
     local shown = math.min(#items, MAX_ROWS)
     if #items > MAX_ROWS then shown = MAX_ROWS - 1 end
+    local bonesRow
     for i, r in ipairs(rows) do
         local it = items[i]
         if it and i <= shown then
             r.icon:SetTexture(it.icon or 134400)
+            -- our Fishbone art is the whole square; game icons lose their border
+            r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92) -- the Fishbone has a game-style icon too
+            for _, st in ipairs(r.sparkles) do
+                st:SetShown(it.bones and true or false)
+                if it.bones then st.ag:Play() else st.ag:Stop() end
+            end
+            r.newTag:SetShown(not it.bones and ns.Journal and ns.Journal:IsJustNew(it.id) and true or false)
+            if r.newTag:IsShown() and ns.Glint then ns.Glint(r.newTag, 4, 1.5) end
             local name = it.name or "?"
             if it.count and it.count > 1 then name = name .. " |cffffffffx" .. it.count .. "|r" end
             r.text:SetText(name)
             -- rarity in the band, white text
             local q = it.quality
             local cr, cg, cb
-            if q and q >= 0 then cr, cg, cb = QualityColor(q) else cr, cg, cb = 1, 0.82, 0 end -- coins
+            if q and q >= 0 then cr, cg, cb = QualityColor(q) else cr, cg, cb = 1, 0.82, 0 end -- coins and Fishbones
             local strong = (q or 1) >= 2 or not q -- softer for common/poor
             Splash.Band(r.wash, cr, cg, cb, strong and 0.45 or 0.18)
             for _, e in ipairs(r.edges) do Splash.Band(e, cr, cg, cb, strong and 0.95 or 0.4) end
-            if q == 0 then r.text:SetTextColor(0.75, 0.75, 0.75) else r.text:SetTextColor(1, 1, 1) end
+            if q == 0 then r.text:SetTextColor(0.75, 0.75, 0.75)
+            elseif it.bones then r.text:SetTextColor(1, 0.86, 0.35); bonesRow = r
+            else r.text:SetTextColor(1, 1, 1) end
             local w = math.min(r.text:GetStringWidth() or 0, 380)
             r.icon:ClearAllPoints()
             r.icon:SetPoint("LEFT", r, "CENTER", -(w + ROW_H + 2) / 2, 0)
@@ -197,6 +240,14 @@ function Splash:Show(items)
     Splash.PlaySound()
     frame:Show()
     Splash:Animate()
+    -- the Fishbone glints, with a little clink, as its line comes in
+    if bonesRow and C_Timer then
+        C_Timer.After(0.35 + 0.08 * shown, function()
+            if not frame:IsShown() then return end
+            if ns.Glint then ns.Glint(bonesRow.icon, 4, 1.2) end
+            pcall(PlaySound, (SOUNDKIT and SOUNDKIT.LOOT_WINDOW_COIN_SOUND) or 120, "SFX")
+        end)
+    end
 end
 
 -- call before looting
@@ -251,7 +302,7 @@ local function BuildMiss()
     if miss then return end
     miss = CreateFrame("Frame", "RubberDuckyMiss", UIParent)
     miss:SetSize(512, 300)
-    miss:SetFrameStrata("HIGH")
+    miss:SetFrameStrata("FULLSCREEN_DIALOG")
     miss:EnableMouse(false)
     miss:Hide()
     miss.art = miss:CreateTexture(nil, "ARTWORK")

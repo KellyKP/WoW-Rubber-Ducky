@@ -1,4 +1,7 @@
-Copyright (c) 2010-2012 Patrick Wagesreiter (mail@patrickwagesreiter.at)
+PatrickHand-Regular.ttf: Copyright (c) 2010-2012 Patrick Wagesreiter (mail@patrickwagesreiter.at)
+LilitaOne-Regular.ttf: Copyright (c) 2011 Juan Montoreano (juan@remolacha.biz), with Reserved Font Name "Lilita"
+
+Both fonts are licensed under the SIL Open Font License, Version 1.1, below.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

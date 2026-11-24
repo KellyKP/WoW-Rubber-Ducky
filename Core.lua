@@ -54,6 +54,23 @@ ns.defaults = {
     logButton   = false,  -- a little button that opens and closes the log
     logButtonLocked = false, -- right-click the button to lock it in place
     logButtonSize   = 40,    -- about an action button
+    journalEnabled  = true,
+    challengeToasts = true,   -- the banner at the top of the screen when you finish one
+
+    -- Fishing flair: quarterboards over heads while fishing
+    socialEnabled = true,
+    shareFlair    = true,    -- others see yours
+    seeFlair      = true,    -- you see theirs
+    logBoard      = true,    -- yours hangs off the fishing log
+    boardWidth    = 240,     -- Small 200, Medium 240, Large 280
+    boardLift     = 4,       -- how far above the name: Low -6, Medium 4, High 16
+    journalScale    = 1,
+    journalSort     = "zone",
+    journalFindsSort = "type",
+    journalFindsShow = "all",
+    journalButton   = false,  -- an on-screen journal button, like the log's
+    journalButtonLocked = false,
+    journalButtonSize   = 40,
 
     -- Pole swap
     swapSplash = true,
@@ -102,6 +119,44 @@ function ns.Print(msg, ...)
 end
 
 -- Reading game state can hit "secret" values that throw; wrap it in Safe().
+-- Developer page, "Reset everything": as if Rubber Ducky had just been
+-- installed. First put back every game setting we changed while fishing (the
+-- saves that remember them are about to go), then forget everything and reload.
+function ns.FactoryReset()
+    if ns.Social then pcall(ns.Social.Stop, ns.Social); pcall(ns.Social.RecoverFromCrash, ns.Social) end
+    for _, m in ipairs({ ns.Sound, ns.Bobber, ns.Camera }) do
+        if m and m.RecoverFromCrash then pcall(m.RecoverFromCrash, m) end
+    end
+    RubberDuckyDB = nil
+    RubberDuckyJournalDB = nil
+    if ReloadUI then ReloadUI() end
+end
+
+-- Shrink a line of text until it fits `room`, rather than cutting it with "...".
+-- Its width is never held: a fontstring held to a width measures no wider
+-- than it. Anchor it by its middle. (min: smallest size it may go)
+function ns.Squeeze(fs, room, min)
+    if not fs or not room or room <= 0 then return end
+    fs:SetWidth(0)
+    local font, size, flags = fs:GetFont()
+    for _ = 1, 4 do
+        local tw = fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth() or fs:GetStringWidth() or 0
+        if not font or not size or tw <= room or tw <= 0 or size <= (min or 5) then break end
+        size = math.max(min or 5, size * room / tw * 0.97)
+        fs:SetFont(font, size, flags)
+    end
+    -- and left free: a held width can measure clipped next time round, and
+    -- the line would flick between shrunk and cut while things move
+end
+
+-- after both have been squeezed: the second line never outgrows `ratio` of the
+-- first (a name stays bigger than its motto, however long the name)
+function ns.Under(top, sub, ratio)
+    local _, a = top:GetFont()
+    local font, b, flags = sub:GetFont()
+    if a and b and font and b > a * ratio then sub:SetFont(font, a * ratio, flags) end
+end
+
 function ns.Safe(fn, ...)
     local ok, a, b, c, d = pcall(fn, ...)
     if ok then return a, b, c, d end
@@ -253,6 +308,7 @@ function ns:OnFishingStart()
         end
     end)
     self:BeginSession()
+    if self.Journal then self.Safe(self.Journal.NoteCast, self.Journal) end
     if self.OneKey then self.OneKey:Update() end
     if self.Bobber then self.Bobber:StartTracking() end
     if self.Probe then self.Probe:OnCastStart() end
@@ -290,6 +346,7 @@ function ns:ShowMiss(kind)
     if InCombatLockdown and InCombatLockdown() then return end
     self.missShownFor = cast
     self.misses = (self.misses or 0) + 1
+    if self.Journal then self.Safe(self.Journal.NoteMiss, self.Journal) end
     if self.db.soundReturnOnLoot and self.Sound and not self.fishing then self.Sound:Restore() end
     if self.Probe then self.Probe:Mark("miss shown: " .. kind) end
     if self.Splash then self.Safe(self.Splash.ShowMiss, self.Splash, kind) end
@@ -356,6 +413,10 @@ EVENTS:SetScript("OnEvent", function(_, event, ...)
         end
         ns.db = RubberDuckyDB
         BuildFishingNames()
+        -- settings pages now, while the game is still loading: Forever's Settings
+        -- window can only open straight to pages added this early (later ones
+        -- show up in the list, but opening to them lands on the first addon page)
+        if ns.Options then ns.Safe(ns.Options.Build, ns.Options) end
 
     elseif event == "PLAYER_LOGIN" then
         BuildFishingNames()
@@ -365,7 +426,10 @@ EVENTS:SetScript("OnEvent", function(_, event, ...)
         if ns.Camera then ns.Camera:RecoverFromCrash() end
         if ns.Options then ns.Options:Build() end
         if ns.Console then ns.Console:Apply() end
+        if ns.Flair then ns.Safe(ns.Flair.Keep); ns.Safe(ns.Flair.HookChat) end -- the bobber you're using stays yours
         local firstTime = ns.Welcome and ns.Welcome:MaybeShowFirstTime()
+        -- what's already done gets marked quietly, a moment after the world loads
+        if ns.Challenges then ns.After(4, function() ns.Safe(ns.Challenges.Check, ns.Challenges) end) end
         local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
         local ok, v = pcall(get, ADDON, "Version")
         v = ok and v or nil
@@ -429,7 +493,10 @@ EVENTS:SetScript("OnEvent", function(_, event, ...)
             -- read the catch before auto loot takes it
             if ns.Log and ns.Splash then
                 local ok, items = pcall(ns.Splash.ReadLoot)
-                if ok then ns.Safe(ns.Log.Add, ns.Log, items) end
+                if ok then
+                    local fresh = ns.Journal and ns.Safe(ns.Journal.Record, ns.Journal, items)
+                    ns.Safe(ns.Log.Add, ns.Log, items, fresh)
+                end
             end
         end
         -- LOOT_READY's argument: the game is already auto-looting
@@ -459,9 +526,12 @@ local function Help()
     print("  /ducky swap          swap between your fishing pole and weapon")
     print("  /ducky swap 1 | 2    put on your pole (1) or weapon (2)")
     print("  /ducky log           open or close the fishing log")
+    print("  /ducky journal       open or close the fishing journal")
+    print("  /ducky challenges    open or close Ducky's Challenges")
+    print("  /ducky shop          visit Mrrl's Doohicky Emporium")
     print("  /ducky welcome       show the welcome screen again")
     print("  /ducky restore       put your sound, camera and soft-target settings back now")
-    -- developer commands (debug, console, button, probe, events, mark) aren't listed
+    -- developer commands (debug, console, button, probe, events, mark, flairtest) aren't listed
 end
 
 local function Toggle(key, label)
@@ -508,6 +578,14 @@ SlashCmdList.RUBBERDUCKY = function(msg)
         end
     elseif msg == "log" then
         if ns.Log then ns.Log:Toggle(true) end
+    elseif msg == "journal" then
+        if ns.Journal then ns.Journal:Toggle(true) end
+    elseif msg == "challenges" then
+        if ns.ChallengesWindow then ns.ChallengesWindow:Toggle() end
+    elseif msg == "flairtest" then
+        if ns.Social then ns.Social:Test() end
+    elseif msg == "shop" or msg == "mrrl" then
+        if ns.Shop then ns.Shop:Toggle() end
     elseif msg == "events" then
         if ns.Probe then ns.Probe:ShowLog() end
     elseif msg == "mark" then

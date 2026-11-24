@@ -9,14 +9,18 @@ Rubber Ducky makes fishing easier on the ears and eyes. It hushes the world so t
 ## Features
 
 - **Sound focus.** While your line is out, sound effects go up and music, ambience and dialog fade to a low mumble. It fades back as soon as you catch something or miss.
-- **Bobber marker.** A rubber duck, or any of 24 bobber icons, floats above your bobber, with sparkles around it.
+- **Bobber marker.** A rubber duck, or any of 37 bobber icons, floats above your bobber, with sparkles around it. Each one has a little story in the picker.
 - **Fishing camera.** The camera eases in toward the water while you fish and back out when you're done.
 - **One-button fishing.** With a pole equipped, one button casts and reels in. You can use Interact, or the left or right trigger on a controller. The button goes back to normal when you take the pole off or combat starts.
 - **Auto loot.** Your catch goes straight to your bags, whichever button reeled it in. It doesn't change the game's own auto-loot setting.
 - **Catch splash.** A banner slams onto the screen with what you caught, and each item's rarity colours its line. Misses get a splash too: "Missed!" when you reel in empty, and "Zzz..." when the cast runs out.
-- **Fishing log.** Everything you caught this session on a parchment board: how many, what it was, and a cute note, both written in the catch's rarity colour. It opens when you equip a fishing pole and closes when you put it away, can be dragged anywhere, and pages when you've caught more than six kinds of thing. An optional log button brings it up any time; right-click it to lock it in place.
-- **Pole swap.** Drag the Pole swap icon onto any action bar or crossbar slot. One press puts your fishing pole on, and the next puts back the weapon you had before, each with its own splash and sound.
-
+- **Fishing log.** Everything you caught this session on a parchment board: how many, what it was, and a cute note, both written in the catch's rarity colour. It opens when you equip a fishing pole and closes when you put it away, can be dragged anywhere, and scrolls when you've caught more than seven kinds of thing. An optional log button brings it up any time; right-click it to lock it in place.
+- **Fishing journal.** A leather-bound book of everything you've ever caught, one for each character. Catches is every fish you've caught, with a little map of where each one bit, your own notes and a word from Ducky; Whosits & Whatsits holds everything else that comes up on the line; Waters lists every spot you've fished and what bites there; Records keeps your totals, personal bests, streaks, firsts and collection progress.
+- **Ducky's Challenges.** Dozens of little goals, from finding all three Rumsey Rums to catching something after midnight, some hidden until you stumble on them.
+- **Shiny Fishbones.** Now and then one comes up with your catch, and every challenge pays some. They turn up more often by a Fishing Rack or Fishing Hut, in a Lucky Fishing Hat, at the Stranglethorn Fishing Extravaganza, or with Fellow Ducky Anglers fishing in your zone.
+- **Mrrl's Doohicky Emporium.** Trade your Fishbones with Mrrl for bobbers, quarterboards, charms and mottos. Give him a poke and he'll chat.
+- **Fishing flair.** While your pole is out, your quarterboard hangs over your head with your name and motto, your bobber and charm swinging from it, for Fellow Ducky Anglers to see. Yours hangs off the top of the fishing log.
+- **Pole swap.** Drag the Pole swap icon onto any action bar or crossbar slot. One press puts your fishing pole on, and the next puts back the weapon you had before, each with its own splash and sound. It warns you if either one is broken.
 - **Share settings.** Copy your settings as text to share your setup, or paste a friend's. It's on the overview page.
 
 ## Install
@@ -29,7 +33,7 @@ The first time you log in, a welcome screen helps you set things up. After that,
 
 ## Commands
 
-You can also click **Rubber Ducky** in the minimap's AddOns list for a menu with the fishing log and settings.
+You can also click **Rubber Ducky** in the minimap's AddOns list for a menu with the fishing log, the journal, Ducky's Challenges, Mrrl's shop and settings.
 
 | Command | What it does |
 |---|---|
@@ -38,6 +42,9 @@ You can also click **Rubber Ducky** in the minimap's AddOns list for a menu with
 | `/ducky swap` | Swap between your fishing pole and your weapon, out of combat (what the Ducky Pole macro runs) |
 | `/ducky swap 1`, `/ducky swap 2` | Put on your pole (1) or your weapon (2). `pole` and `weapon` work too |
 | `/ducky log` | Open or close the fishing log |
+| `/ducky journal` | Open or close the fishing journal |
+| `/ducky challenges` | Open or close Ducky's Challenges |
+| `/ducky shop` | Visit Mrrl's Doohicky Emporium |
 | `/ducky test` | Preview the sparkle and bobber icon |
 | `/ducky focus`, `sparkle`, `marker`, `camera`, `onekey` | Turn a feature on or off |
 | `/ducky welcome` | Show the welcome screen again |
@@ -61,7 +68,7 @@ For more detail, open the **Developer** page in the settings and switch on debug
 
 The camera and one-button approaches follow [Improved Forever](https://www.curseforge.com/wow/addons/improved-forever) (MIT), which showed what Forever allows.
 
-The handwriting in the fishing log is [Patrick Hand](https://fonts.google.com/specimen/Patrick+Hand) by Patrick Wagesreiter, under the SIL Open Font License (`Media/Fonts/OFL.txt`).
+The handwriting in the fishing log and on the signs is [Patrick Hand](https://fonts.google.com/specimen/Patrick+Hand) by Patrick Wagesreiter, and Mrrl's lettering is [Lilita One](https://fonts.google.com/specimen/Lilita+One) by Juan Montoreano, both under the SIL Open Font License (`Media/Fonts/OFL.txt`).
 
 ## License
 

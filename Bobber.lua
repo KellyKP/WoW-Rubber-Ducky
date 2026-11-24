@@ -137,6 +137,53 @@ local function HideSparkle()
     sparkle:ClearAllPoints()
 end
 
+-- A short burst of the same stars over any part of the interface (the New!
+-- badges): ns.Glint(region, count, seconds). Safe to call again while running.
+function ns.Glint(region, count, seconds)
+    if not (region and region.GetParent) then return end
+    local f = region.rdGlint
+    if not f then
+        local parent = region.GetObjectType and region:GetObjectType() == "Texture" and region:GetParent() or region
+        f = CreateFrame("Frame", nil, parent)
+        f:SetAllPoints(region)
+        f:SetFrameLevel((parent.GetFrameLevel and parent:GetFrameLevel() or 1) + 6)
+        f.sparks = {}
+        region.rdGlint = f
+    end
+    f:Show()
+    local untilT = GetTime() + (seconds or 1.2)
+    local w, h = region:GetWidth() or 40, region:GetHeight() or 20
+    for i = 1, count or 4 do
+        local s = f.sparks[i]
+        if not s then
+            local tex = f:CreateTexture(nil, "OVERLAY")
+            tex:SetTexture("Interface\\Cooldown\\star4")
+            tex:SetBlendMode("ADD")
+            tex:SetAlpha(0)
+            local anim = tex:CreateAnimationGroup()
+            local a1 = anim:CreateAnimation("Alpha"); a1:SetFromAlpha(0); a1:SetToAlpha(1); a1:SetDuration(0.2); a1:SetOrder(1)
+            local g = anim:CreateAnimation("Scale"); g:SetScaleFrom(0.2, 0.2); g:SetScaleTo(1, 1); g:SetDuration(0.2); g:SetOrder(1)
+            local r = anim:CreateAnimation("Rotation"); r:SetDegrees(-90); r:SetDuration(0.5); r:SetOrder(1)
+            local a2 = anim:CreateAnimation("Alpha"); a2:SetFromAlpha(1); a2:SetToAlpha(0); a2:SetDuration(0.3); a2:SetOrder(2)
+            s = { tex = tex, anim = anim }
+            f.sparks[i] = s
+        end
+        local function Again()
+            if GetTime() > f.untilT then s.tex:SetAlpha(0); return end
+            s.tex:ClearAllPoints()
+            s.tex:SetPoint("CENTER", f, "CENTER", (math.random() - 0.5) * f.w, (math.random() - 0.5) * f.h)
+            local px = 7 + math.random() * 9
+            s.tex:SetSize(px, px)
+            local c = COLORS[math.random(#COLORS)]
+            s.tex:SetVertexColor(c[1], c[2], c[3])
+            C_Timer.After(math.random() * 0.35, function() s.anim:Play() end)
+        end
+        s.anim:SetScript("OnFinished", function() s.tex:SetAlpha(0); Again() end)
+        f.untilT, f.w, f.h = untilT, w, h
+        if not s.anim:IsPlaying() then Again() end
+    end
+end
+
 function Bobber:RefreshSparkle()
     if not sparkling then return end
     sparkling = false
@@ -150,19 +197,104 @@ end
 -------------------------------------------------------------------------------
 
 Bobber.MARKERS = {
+    -- price = on Mrrl's shelf, for that many Shiny Fishbones; earn = the
+    -- challenge that finds it for you; the rest are always yours
     { "classic",     "Classic Red" },   { "cork",       "Cork" },
     { "pencil",      "Pencil Float" },  { "bluestripe", "Blue Stripes" },
     { "alliance",    "Alliance" },      { "horde",      "Horde" },
     { "feather",     "Feathered" },     { "greenglass", "Green Glass" },
-    { "arcane",      "Arcane" },        { "molten",     "Molten" },
-    { "frost",       "Frost" },         { "leafy",      "Leafy" },
+    { "arcane",      "Arcane", price = 80 },
+    { "molten",      "Molten", price = 80 },
+    { "frost",       "Frost", price = 80 },
+    { "leafy",       "Leafy" },
     { "sweetheart",  "Sweetheart" },    { "fish",       "Fish" },
-    { "duck",        "Rubber Duck" },   { "crab",       "Crab" },
-    { "keg",         "Keg" },           { "sharkfin",   "Shark Fin" },
-    { "glowlantern", "Glowing Orb" },   { "moonlit",    "Moonlit" },
-    { "tentacle",    "Tentacle" },      { "skull",      "Skull" },
-    { "lifering",    "Life Ring" },     { "lantern",    "Lantern" },
+    { "duck",        "Rubber Duck" },
+    { "crab",        "Crab", price = 60 },
+    { "keg",         "Keg", price = 60 },
+    { "sharkfin",    "Shark Fin", price = 90 },
+    { "glowlantern", "Glowing Orb", price = 70 },
+    { "moonlit",     "Moonlit", price = 70 },
+    { "tentacle",    "Tentacle", price = 90 },
+    { "skull",       "Skull", price = 90 },
+    { "lifering",    "Life Ring", price = 50 },
+    { "lantern",     "Lantern" },
+    -- a third value is a dedication, shown under the name in the picker,
+    -- with an optional fourth: a small logo (Media/Logos/<name>.tga) after it
+    { "frog",        "Froggy", "For mollpies", "twitch" },
+    { "murloc",      "Murloc", price = 100 },
+    { "otter",       "Otter", price = 100 },
+    { "pipi",        "Pipi" },
+    { "thrall",      "Thrall", price = 150 },
+    { "jaina",       "Jaina", price = 150 },
+    { "rumbottle",     "Rum Bottle",          price = 60 },
+    { "treasurechest", "Treasure Chest",      earn = "treasure2" },
+    { "oldboot",       "Old Boot",            earn = "junk2" },
+    { "goldenduck",    "Golden Duck",         earn = "fish3" },
+    { "compass",       "Compass",             earn = "tour3" },
+    { "bottlemessage", "Message in a Bottle", price = 70 },
+    { "clover",        "Four-Leaf Clover",    price = 80 },
+    { "hourglass",     "Hourglass",           price = 80 },
+    { "trophy",        "Trophy",              price = 100 },
+    { "owl",           "Night Owl",           price = 90 },
+    { "rooster",       "Rooster",             price = 90 },
+    { "trophyfish",    "Trophy Fish",         price = 120 },
 }
+
+-- A line of lore for every bobber, in the picker: where it turned up
+Bobber.LORE = {
+    classic = "The one every angler starts with. Red side up, mostly.",
+    cork = "Pulled from a wine bottle in Stormwind. The wine didn't last.",
+    pencil = "A gnome's design: long, thin and wildly over-engineered.",
+    bluestripe = "Painted by a Menethil dockhand with leftover boat paint.",
+    alliance = "Lion-blue and proud. Floats best in Alliance waters, apparently.",
+    horde = "Forged in Orgrimmar. It bobs aggressively.",
+    feather = "A gryphon lost a feather. A fisher found a float.",
+    greenglass = "Old Kul Tiran glass, worn smooth by a hundred tides.",
+    arcane = "Hums faintly. Dalaran swears it isn't theirs.",
+    molten = "Fished out of Searing Gorge. Still warm, somehow.",
+    frost = "Carved from Winterspring ice. Never quite melts.",
+    leafy = "Woven by a druid who wanted the fish to feel at home.",
+    sweetheart = "Somebody's love note, sealed in a float. Shh.",
+    fish = "A fish shaped like a float, or a float shaped like a fish. Nobody knows.",
+    duck = "Ducky! The very best bobber. No bias here.",
+    crab = "Snatched it right off the line and then just... stayed.",
+    keg = "From a Thunderbrew barrel. The ale went first, naturally.",
+    sharkfin = "Clears a lake out fast. Fish are rightly nervous.",
+    glowlantern = "Glows softly through the night. Moths adore it.",
+    moonlit = "Catches the moonlight on Lake Elune'ara.",
+    tentacle = "Found it in Darkshore. Best not to ask what it's attached to.",
+    skull = "A pirate's lucky charm. Luckier for the fish, it turns out.",
+    lifering = "Off a Booty Bay ship. Saved a gnome, once.",
+    lantern = "Lights the way for night fishing on the Barrens' oases.",
+    frog = "A happy little frog, ribbiting along on the ripples.",
+    murloc = "Mrglglgl! Traded for a shiny button.",
+    otter = "Floats on its back, holding a tiny pebble. Adorable.",
+    pipi = "Pipi came to fish and stayed for the company.",
+    thrall = "Steady as the Warchief himself. Very serious about fishing.",
+    jaina = "A little Kul Tiran charm. Wind and waves at her command.",
+    rumbottle = "Found with the third Rumsey Rum. Somebody's party ran out of bottles.",
+    treasurechest = "Every treasure in the water, and this was the last one at the bottom.",
+    oldboot = "The one boot that got away, back for its laces.",
+    goldenduck = "Every fish in the book, and Ducky's very proudest gift: gold.",
+    compass = "Thirty zones later, it always points to the next good spot.",
+    bottlemessage = "The message inside just says: \"keep fishing.\"",
+    clover = "Three treasures in a row? That's no accident. Keep this close.",
+    hourglass = "Four hours of fishing, and every grain of sand well spent.",
+    trophy = "Three hundred catches in one sitting. Polished and well earned.",
+    owl = "Hooted from a branch past midnight until you noticed it.",
+    rooster = "Crows at dawn, right when the fish start biting.",
+    trophyfish = "Fifty pounds, tag and all. Nobody back home believed it.",
+}
+
+-- yours: always, bought from Mrrl, or earned from a challenge (Flair.lua)
+function Bobber.Unlocked(i)
+    local m = Bobber.MARKERS[i]
+    if not m then return false end
+    if not m.earn and not m.price then return true end
+    local F = ns.Flair
+    local ok, have = pcall(function() return F and F.Owns(F.Get("bobber", m[1])) end)
+    return ok and have or false
+end
 
 local marker = CreateFrame("Frame", "RubberDuckyBobberMarker", UIParent)
 marker:SetFrameStrata("LOW")
@@ -182,7 +314,13 @@ fadeIn:SetFromAlpha(0); fadeIn:SetToAlpha(1); fadeIn:SetDuration(0.2)
 
 local function PickMarker()
     local style = ns.db.markerStyle or 0
-    if style < 1 or style > #Bobber.MARKERS then style = math.random(#Bobber.MARKERS) end
+    if style >= 1 and not Bobber.Unlocked(style) then style = 15 end -- not yours (yet): the duck
+    if style < 1 or style > #Bobber.MARKERS then
+        -- random: from the ones you have
+        local have = {}
+        for i = 1, #Bobber.MARKERS do if Bobber.Unlocked(i) then have[#have + 1] = i end end
+        style = have[math.random(#have)] or 15
+    end
     markerTex:SetTexture(ns.BobberArt(Bobber.MARKERS[style][1]))
 end
 
@@ -203,6 +341,8 @@ end
 
 -- icon picked or switched on/off: show the change on the live bobber too
 function Bobber:RefreshMarker()
+    -- your bobber hangs on your quarterboard too
+    if ns.Flair and ns.Flair.Changed then ns.Flair.Changed() end
     if not ns.db.markerEnabled then HideMarker() return end
     if marker:IsShown() then PickMarker()
     elseif ns.fishing and self.Attach then self:Attach() end

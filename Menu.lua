@@ -10,7 +10,7 @@ local _, ns = ...
 local Menu = { items = {} }
 ns.Menu = Menu
 
-local ROW_H, WIDTH, PAD = 22, 170, 8
+local ROW_H, WIDTH, PAD = 22, 180, 14
 local menu, rows, closedAt = nil, {}, 0
 
 function Menu:Add(item)
@@ -20,16 +20,12 @@ function Menu:Add(item)
 end
 
 local function Build()
-    menu = CreateFrame("Frame", "RubberDuckyMenu", UIParent, "BackdropTemplate")
+    menu = CreateFrame("Frame", "RubberDuckyMenu", UIParent)
     menu:SetFrameStrata("DIALOG")
     menu:SetClampedToScreen(true)
     menu:EnableMouse(true)
-    menu:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 14,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 },
-    })
+    -- a navy panel in gold corners, like the rest of Rubber Ducky's windows
+    ns.UI.Stretch(menu, "tile_navy", "BACKGROUND", 0.4)
     menu:Hide()
     tinsert(UISpecialFrames, "RubberDuckyMenu")
 
@@ -104,53 +100,57 @@ function Menu:Toggle(anchor)
     self:Show(anchor)
 end
 
--- The two items we have today. Settings stays at the bottom.
+-- What's in the menu. Settings stays at the bottom.
 Menu:Add{
     text = "Fishing log", order = 10,
     disabled = function() return not (ns.db and ns.db.logEnabled) end,
     onClick = function() if ns.Log then ns.Log:Toggle(true) end end,
 }
 Menu:Add{
+    text = "Fishing journal", order = 20,
+    disabled = function() return not (ns.db and ns.db.journalEnabled) end,
+    onClick = function() if ns.Journal then ns.Journal:Toggle(true) end end,
+}
+Menu:Add{
+    text = "Ducky's Challenges", order = 30,
+    onClick = function() if ns.ChallengesWindow then ns.ChallengesWindow:Toggle() end end,
+}
+Menu:Add{
+    text = "Mrrl's Shop", order = 40, -- the full name doesn't fit the menu
+    onClick = function() if ns.Shop then ns.Shop:Toggle() end end,
+}
+Menu:Add{
     text = "Settings", order = 100,
     onClick = function() if ns.Options then ns.Options:Open() end end,
 }
 
--- Our line in the minimap's AddOns list. Registered here rather than in the
--- TOC so the name shows in plain white like everyone else's (the TOC title is
--- gold, for the AddOns window).
+-- Our line in the minimap's AddOns list, from the TOC (## AddonCompartmentFunc...).
+-- Adding it from code instead (AddonCompartmentFrame:RegisterAddon) let our code
+-- into the list's own menu, which then blocked an action. The TOC title is plain
+-- so the name is white there like everyone else's.
 local hovered -- the list's button under the mouse, to open the menu beside it
-local function Tip(btn)
+
+-- the list's buttons get reused, so pin the menu to where it was, not to it
+local function Spot(btn)
+    if not (type(btn) == "table" and btn.GetLeft and btn:GetLeft()) then return nil end
+    local s = btn:GetEffectiveScale() / UIParent:GetEffectiveScale()
+    return { x = btn:GetLeft() * s, y = btn:GetTop() * s }
+end
+
+function RubberDucky_OnAddonCompartmentClick()
+    local spot = Spot(hovered)
+    C_Timer.After(0, function() Menu:Toggle(spot) end) -- after the list's own click is done
+end
+
+function RubberDucky_OnAddonCompartmentEnter(_, btn)
     hovered = btn
     if not GameTooltip then return end
-    GameTooltip:SetOwner(btn or UIParent, "ANCHOR_LEFT")
+    GameTooltip:SetOwner(type(btn) == "table" and btn or UIParent, "ANCHOR_LEFT")
     GameTooltip:SetText("Rubber Ducky")
     GameTooltip:AddLine("Click for the Rubber Ducky menu.", 1, 1, 1)
     GameTooltip:Show()
 end
 
--- the list's buttons get reused, so pin the menu to where it was, not to it
-local function Spot(btn)
-    if not (btn and btn.GetLeft and btn:GetLeft()) then return nil end
-    local s = btn:GetEffectiveScale() / UIParent:GetEffectiveScale()
-    return { x = btn:GetLeft() * s, y = btn:GetTop() * s }
+function RubberDucky_OnAddonCompartmentLeave()
+    if GameTooltip then GameTooltip:Hide() end
 end
-
-function Menu.Register()
-    local list = AddonCompartmentFrame
-    if not (list and list.RegisterAddon) then return end
-    list:RegisterAddon({
-        text = "Rubber Ducky",
-        icon = ns.DUCK,
-        notCheckable = true,
-        func = function() Menu:Toggle(Spot(hovered)) end,
-        funcOnEnter = Tip,
-        funcOnLeave = function() if GameTooltip then GameTooltip:Hide() end end,
-    })
-end
-
-local login = CreateFrame("Frame")
-login:RegisterEvent("PLAYER_LOGIN")
-login:SetScript("OnEvent", function(self)
-    self:UnregisterEvent("PLAYER_LOGIN")
-    Menu.Register()
-end)

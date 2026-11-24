@@ -39,6 +39,25 @@ local function InBags(id)
     return (ns.Safe(function() return C_Item.GetItemCount(id) end) or 0) > 0
 end
 
+-- Broken: in your bags, but worn down to nothing (0 durability). The game
+-- still lets you hold it, it just does nothing until it's repaired.
+local function Broken(id)
+    if not id then return false end
+    local broken, whole = false, false
+    ns.Safe(function()
+        for bag = 0, (NUM_BAG_SLOTS or 4) do
+            for slot = 1, C_Container.GetContainerNumSlots(bag) or 0 do
+                if C_Container.GetContainerItemID(bag, slot) == id then
+                    local cur, max = C_Container.GetContainerItemDurability(bag, slot)
+                    if max and max > 0 and cur == 0 then broken = true else whole = true end
+                end
+            end
+        end
+    end)
+    return broken and not whole
+end
+Gear.Broken = Broken
+
 -- last pole used if you still have it, else the first in your bags
 local function FindPole()
     local last = Gear.Mine().pole
@@ -155,6 +174,7 @@ function Gear:Swap(target)
         if Gear.PoleEquipped() then return false end
         local pole = FindPole()
         if not pole then Say("Oops! Can't find your fishing pole. Did you misplace it?"); return false end
+        if Broken(pole) then Say("Heads up: your fishing pole's broken! It won't catch a thing until it's repaired.") end
         swapAt = GetTime()
         ns.Safe(equip, pole, MH)
     else
@@ -163,6 +183,9 @@ function Gear:Swap(target)
         if not (w and w.mh) then Say("I don't know your weapon yet! Equip it once and I'll remember it."); return false end
         if not InBags(w.mh) and Equipped(MH) ~= w.mh then
             Say("Oops! Can't find your weapon. Did you misplace it?"); return false
+        end
+        if Broken(w.mh) or Broken(w.oh) then
+            Say("Heads up: your weapon's broken! It won't do much until it's repaired.")
         end
         swapAt = GetTime()
         ns.Safe(equip, w.mh, MH)

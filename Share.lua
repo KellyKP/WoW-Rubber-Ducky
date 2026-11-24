@@ -106,46 +106,34 @@ end
 local win
 
 local function Build()
-    win = CreateFrame("Frame", "RubberDuckyShare", UIParent, "BackdropTemplate")
-    win:SetSize(520, 330)
-    win:SetPoint("CENTER")
-    win:SetFrameStrata("DIALOG")
-    win:SetMovable(true); win:EnableMouse(true); win:SetClampedToScreen(true)
-    win:RegisterForDrag("LeftButton")
-    win:SetScript("OnDragStart", win.StartMoving)
-    win:SetScript("OnDragStop", win.StopMovingOrSizing)
-    win:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 24,
-        insets = { left = 6, right = 6, top = 6, bottom = 6 },
-    })
-    tinsert(UISpecialFrames, "RubberDuckyShare")
-
-    win.title = win:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    win.title:SetPoint("TOP", 0, -16)
+    -- our navy frame; its plaque says whether it's copying or pasting
+    win = ns.SettingsWindow.Chrome("RubberDuckyShare", nil, { title = "Copy my settings", frame = 0.55,
+        width = 540, height = 370, scale = 1, strata = "DIALOG" })
+    local L, T, R, B = unpack(win.inner)
+    win.title = win.titleText
     win.note = win:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    win.note:SetPoint("TOP", win.title, "BOTTOM", 0, -6)
-    local close = CreateFrame("Button", nil, win, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -4, -4)
+    win.note:SetPoint("TOP", win, "TOP", 0, -T)
 
+    -- the text sits on a darker well
+    local well = win:CreateTexture(nil, "BORDER")
+    well:SetColorTexture(0, 0, 0, 0.35)
+    well:SetPoint("TOPLEFT", L, -(T + 20)); well:SetPoint("BOTTOMRIGHT", -R, B + 48)
     local scroll = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
-    scroll:SetPoint("TOPLEFT", 20, -62)
-    scroll:SetPoint("BOTTOMRIGHT", -36, 50)
+    scroll:SetPoint("TOPLEFT", L + 6, -(T + 26))
+    scroll:SetPoint("BOTTOMRIGHT", -(R + 18), B + 54)
     local edit = CreateFrame("EditBox", nil, scroll)
     edit:SetMultiLine(true)
     edit:SetAutoFocus(false)
     edit:SetFontObject(ChatFontNormal)
-    edit:SetWidth(450)
+    edit:SetWidth(540 - L - R - 30)
     edit:SetScript("OnEscapePressed", function() win:Hide() end)
     scroll:SetScrollChild(edit)
     win.edit = edit
 
-    win.apply = CreateFrame("Button", nil, win, "UIPanelButtonTemplate")
-    win.apply:SetSize(120, 24)
-    win.apply:SetPoint("BOTTOM", 0, 16)
-    win.apply:SetText("Apply")
+    win.apply = ns.UI.Button(win, "Apply", 140, function() end, { height = 42 })
+    win.apply:SetPoint("BOTTOM", 0, B - 4)
     win.apply:SetScript("OnClick", function()
+        ns.UI.Sound("button")
         local n = Share.Import(win.edit:GetText())
         if n > 0 then
             win.note:SetText(("|cff80ff80%d settings applied.|r"):format(n))
@@ -157,7 +145,7 @@ end
 
 function Share:ShowCopy()
     if not win then Build() end
-    win.title:SetText("Copy my settings")
+    ns.SettingsWindow.SetTitle(win, "Copy my settings")
     win.note:SetText(ns.db.shareDebug and "|cffffd100Includes debug info: game details and your list of addons.|r"
         or "Press Ctrl+C to copy.")
     win.apply:Hide()
@@ -169,7 +157,7 @@ end
 
 function Share:ShowPaste()
     if not win then Build() end
-    win.title:SetText("Paste settings")
+    ns.SettingsWindow.SetTitle(win, "Paste settings")
     win.note:SetText("Paste with Ctrl+V, then press Apply.")
     win.apply:Show()
     win.edit:SetText("")

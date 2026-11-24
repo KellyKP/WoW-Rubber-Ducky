@@ -68,6 +68,18 @@ local function GamepadOn()
     return ok and v == "1"
 end
 
+-- Forever's "Enable Gamepad UI" option (the controller layout), not just a
+-- controller being allowed. It's a setting in Options rather than a cvar.
+local GAMEPAD_UI = "GAMEPAD_INTERFACE_TOGGLE"
+local function GamepadUIOn()
+    local setting = Settings and Settings.GetSetting and ns.Safe(Settings.GetSetting, GAMEPAD_UI)
+    local v
+    if setting and setting.GetValue then v = ns.Safe(setting.GetValue, setting)
+    else v = ns.Safe(GetCVar, GAMEPAD_UI) end
+    return v == true or v == 1 or v == "1"
+end
+OK.GamepadUIOn = GamepadUIOn
+
 local fallbackNoted = false
 
 local NAMES = {
@@ -102,14 +114,14 @@ end
 
 -- For the settings: what a button choice is bound to, and whether it can work.
 local ICON_STYLE = { xbox = "Ltr", playstation = "Shp", switch = "Rev" }
-local function TriggerIcon(side)
+local function TriggerIcon(side, px)
     local style = ICON_STYLE[OK.PadType()]
     local name = side == "left" and "LTrigger" or "RTrigger"
     if C_Texture and C_Texture.GetAtlasInfo then
         for _, size in ipairs({ "_64", "_32", "" }) do
             local atlas = "Gamepad_" .. style .. "_" .. name .. size
             local ok, info = pcall(C_Texture.GetAtlasInfo, atlas)
-            if ok and info then return "|A:" .. atlas .. ":18:18|a" end
+            if ok and info then return ("|A:%s:%d:%d|a"):format(atlas, px or 18, px or 18) end
         end
     end
     return "[" .. OK.TriggerName(side) .. "]"
@@ -118,6 +130,37 @@ local function KeyText(key)
     local t = GetBindingText and GetBindingText(key) or key
     return "[" .. (t or key):gsub("Mouse Button ", "Mouse ") .. "]"
 end
+OK.GamepadOn = GamepadOn
+OK.TriggerIcon = TriggerIcon
+
+-- a controller button as a picture (the game's own, if it has one) or a short name
+local GLYPH = {
+    xbox = { PAD1 = "A", PAD2 = "B", PAD3 = "X", PAD4 = "Y", PADLSHOULDER = "LB", PADRSHOULDER = "RB", PADBACK = "View", DPAD = "D-pad", PADRSTICK = "RS" },
+    playstation = { PAD1 = "Cross", PAD2 = "Circle", PAD3 = "Square", PAD4 = "Triangle", PADLSHOULDER = "L1",
+        PADRSHOULDER = "R1", PADBACK = "Share", DPAD = "D-pad", PADRSTICK = "R3" },
+    switch = { PAD1 = "B", PAD2 = "A", PAD3 = "Y", PAD4 = "X", PADLSHOULDER = "L", PADRSHOULDER = "R", PADBACK = "-", DPAD = "D-pad", PADRSTICK = "RS" },
+}
+local ATLAS_NAME = { PAD1 = { "A", "Cross", "B" }, PAD2 = { "B", "Circle", "A" }, PAD3 = { "X", "Square", "Y" },
+    PAD4 = { "Y", "Triangle", "X" }, PADLSHOULDER = { "LShoulder", "LShoulder", "LShoulder" },
+    PADRSHOULDER = { "RShoulder", "RShoulder", "RShoulder" }, PADBACK = { "View", "Share", "Minus" }, DPAD = { "DPad", "DPad", "DPad" },
+    PADRSTICK = { "RStickIn", "RStickIn", "RStickIn" } }
+function OK.Glyph(button, size)
+    local t = OK.PadType()
+    local style = ICON_STYLE[t]
+    local n = ATLAS_NAME[button] and ATLAS_NAME[button][t == "xbox" and 1 or t == "playstation" and 2 or 3]
+    if n and C_Texture and C_Texture.GetAtlasInfo then
+        -- the pad's own picture, or the game's generic one (the sticks only have those)
+        for _, st in ipairs({ style, "Gen" }) do
+            for _, sfx in ipairs({ "_64", "_32", "" }) do
+                local atlas = "Gamepad_" .. st .. "_" .. n .. sfx
+                local ok, info = pcall(C_Texture.GetAtlasInfo, atlas)
+                if ok and info then return ("|A:%s:%d:%d|a"):format(atlas, size or 16, size or 16) end
+            end
+        end
+    end
+    return "[" .. ((GLYPH[t] or GLYPH.xbox)[button] or button) .. "]"
+end
+
 function OK.Binding(mode)
     if mode == 4 then
         local a, b = GetBindingKey("INTERACTTARGET")

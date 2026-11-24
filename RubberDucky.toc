@@ -1,13 +1,17 @@
 ## Interface: 16001
-## Title: |cffffd100Rubber Ducky|r
+## Title: Rubber Ducky
 ## Notes: Your little fishing buddy.
 ## Author: Rubber Ducky
-## Version: 0.23.0
+## Version: 0.24.0
 ## Category: Professions
 ## Category-enUS: Professions
 ## X-License: MIT
 ## SavedVariables: RubberDuckyDB
+## SavedVariablesPerCharacter: RubberDuckyJournalDB
 ## IconTexture: Interface\AddOns\RubberDucky\Media\Bobbers\duck
+## AddonCompartmentFunc: RubberDucky_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: RubberDucky_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: RubberDucky_OnAddonCompartmentLeave
 
 Core.lua
 Console.lua
@@ -20,9 +24,18 @@ Probe.lua
 Picker.lua
 Splash.lua
 Log.lua
+JournalData.lua
+Journal.lua
 Menu.lua
 UI.lua
+Pad.lua
 Options.lua
+SettingsWindow.lua
 Welcome.lua
+Challenges.lua
+ChallengesWindow.lua
+Flair.lua
+Shop.lua
+Social.lua
 Changelog.lua
 Share.lua
