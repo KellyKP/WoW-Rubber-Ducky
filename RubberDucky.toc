@@ -2,7 +2,7 @@
 ## Title: Rubber Ducky
 ## Notes: Your little fishing buddy.
 ## Author: Rubber Ducky
-## Version: 0.24.0
+## Version: 0.25.0
 ## Category: Professions
 ## Category-enUS: Professions
 ## X-License: MIT
@@ -24,6 +24,7 @@ Probe.lua
 Picker.lua
 Splash.lua
 Log.lua
+Rank.lua
 JournalData.lua
 Journal.lua
 Menu.lua
@@ -37,5 +38,6 @@ ChallengesWindow.lua
 Flair.lua
 Shop.lua
 Social.lua
+Tackle.lua
 Changelog.lua
 Share.lua

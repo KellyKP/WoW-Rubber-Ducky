@@ -139,7 +139,7 @@ end
 
 -- A short burst of the same stars over any part of the interface (the New!
 -- badges): ns.Glint(region, count, seconds). Safe to call again while running.
-function ns.Glint(region, count, seconds)
+function ns.Glint(region, count, seconds, scale) -- scale: bigger stars (default 1)
     if not (region and region.GetParent) then return end
     local f = region.rdGlint
     if not f then
@@ -172,14 +172,14 @@ function ns.Glint(region, count, seconds)
             if GetTime() > f.untilT then s.tex:SetAlpha(0); return end
             s.tex:ClearAllPoints()
             s.tex:SetPoint("CENTER", f, "CENTER", (math.random() - 0.5) * f.w, (math.random() - 0.5) * f.h)
-            local px = 7 + math.random() * 9
+            local px = (7 + math.random() * 9) * (f.scale or 1)
             s.tex:SetSize(px, px)
             local c = COLORS[math.random(#COLORS)]
             s.tex:SetVertexColor(c[1], c[2], c[3])
             C_Timer.After(math.random() * 0.35, function() s.anim:Play() end)
         end
         s.anim:SetScript("OnFinished", function() s.tex:SetAlpha(0); Again() end)
-        f.untilT, f.w, f.h = untilT, w, h
+        f.untilT, f.w, f.h, f.scale = untilT, w, h, scale
         if not s.anim:IsPlaying() then Again() end
     end
 end

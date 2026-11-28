@@ -60,7 +60,6 @@ end
 
 local win, tabs, cells, detail, pager, balance, bubble
 local kind, page, selected = "bobber", 1, nil
-local confirmFor -- the item the Buy button is asking about
 
 local function Sound(what) if ns.UI then ns.UI.Sound(what) end end
 
@@ -192,7 +191,7 @@ end
 local Refresh
 
 local function Select(it)
-    selected, confirmFor = it, nil
+    selected = it
     Refresh()
 end
 
@@ -307,8 +306,80 @@ local function PaintCell(b, it, x, y, w, h)
         b.price:SetText(F.Bones(it.price, 12))
         if st == "short" then b.price:SetTextColor(0.75, 0.75, 0.75) else b.price:SetTextColor(1, 1, 1) end
     end
-    b.ring:SetShown(it == selected)
+    b.ring:Hide() -- the sparkle frame marks the one you picked
     b:Show()
+end
+
+
+-- the one you're looking at: a soft gold glow that breathes, with stars
+-- twinkling on and off all the way round it
+local SPARK_COLORS = { { 1, 0.95, 0.6 }, { 1, 0.82, 0.25 }, { 1, 1, 1 }, { 0.7, 0.9, 1 } }
+local selFx
+local function SelFx()
+    if selFx then return selFx end
+    local f = CreateFrame("Frame", nil, win)
+    f:SetFrameLevel(win:GetFrameLevel() + 20)
+    f:EnableMouse(false)
+    -- the journal's soft selected glow, the same one a picked catch gets
+    local glow = f:CreateTexture(nil, "ARTWORK")
+    glow:SetAllPoints()
+    glow:SetTexture("Interface\\Buttons\\CheckButtonHilight")
+    glow:SetBlendMode("ADD")
+    -- doubled up, so it reads on the dark tiles too
+    local glow2 = f:CreateTexture(nil, "ARTWORK")
+    glow2:SetAllPoints()
+    glow2:SetTexture("Interface\\Buttons\\CheckButtonHilight")
+    glow2:SetBlendMode("ADD")
+    glow2:SetAlpha(0.6)
+    local breathe = f:CreateAnimationGroup()
+    breathe:SetLooping("BOUNCE")
+    local a = breathe:CreateAnimation("Alpha")
+    a:SetFromAlpha(1); a:SetToAlpha(0.7); a:SetDuration(0.9); a:SetSmoothing("IN_OUT")
+    f.breathe = breathe
+    f.sparks = {}
+    for i = 1, 12 do
+        local tex = f:CreateTexture(nil, "OVERLAY")
+        tex:SetTexture("Interface\\Cooldown\\star4")
+        tex:SetBlendMode("ADD")
+        tex:SetAlpha(0)
+        local anim = tex:CreateAnimationGroup()
+        local a1 = anim:CreateAnimation("Alpha"); a1:SetFromAlpha(0); a1:SetToAlpha(1); a1:SetDuration(0.25); a1:SetOrder(1)
+        local g = anim:CreateAnimation("Scale"); g:SetScaleFrom(0.2, 0.2); g:SetScaleTo(1, 1); g:SetDuration(0.25); g:SetOrder(1)
+        local r = anim:CreateAnimation("Rotation"); r:SetDegrees(-90); r:SetDuration(0.7); r:SetOrder(1)
+        local a2 = anim:CreateAnimation("Alpha"); a2:SetFromAlpha(1); a2:SetToAlpha(0); a2:SetDuration(0.4); a2:SetOrder(2)
+        local s = { tex = tex, anim = anim }
+        function s.Again()
+            if not f:IsShown() then tex:SetAlpha(0); return end
+            -- somewhere on the edge
+            local w, h = f:GetWidth() or 60, f:GetHeight() or 60
+            local d = math.random() * 2 * (w + h)
+            local x, y
+            if d < w then x, y = d, 0
+            elseif d < w + h then x, y = w, -(d - w)
+            elseif d < 2 * w + h then x, y = w - (d - w - h), -h
+            else x, y = 0, -(h - (d - 2 * w - h)) end
+            tex:ClearAllPoints()
+            tex:SetPoint("CENTER", f, "TOPLEFT", x, y)
+            local px = 10 + math.random() * 12
+            tex:SetSize(px, px)
+            local c = SPARK_COLORS[math.random(#SPARK_COLORS)]
+            tex:SetVertexColor(c[1], c[2], c[3])
+            C_Timer.After(math.random() * 0.5, function() if f:IsShown() then anim:Play() end end)
+        end
+        anim:SetScript("OnFinished", function() tex:SetAlpha(0); s.Again() end)
+        f.sparks[i] = s
+    end
+    f:SetScript("OnShow", function(self)
+        self.breathe:Play()
+        for _, s in ipairs(self.sparks) do if not s.anim:IsPlaying() then s.Again() end end
+    end)
+    f:SetScript("OnHide", function(self)
+        self.breathe:Stop()
+        for _, s in ipairs(self.sparks) do s.anim:Stop(); s.tex:SetAlpha(0) end
+    end)
+    f:Hide()
+    selFx = f
+    return f
 end
 
 local function PaintShelf()
@@ -340,6 +411,17 @@ local function PaintShelf()
             b.item = nil
             b:Hide()
         end
+    end
+    -- sparkle round the one you're looking at, if it's on this page
+    local fx, on = SelFx(), nil
+    for _, b in ipairs(cells) do if b.item and b.item == selected and b:IsShown() then on = b end end
+    if on then
+        fx:ClearAllPoints()
+        fx:SetPoint("TOPLEFT", on, "TOPLEFT", 2, -2)
+        fx:SetPoint("BOTTOMRIGHT", on, "BOTTOMRIGHT", -2, 2)
+        fx:Show()
+    else
+        fx:Hide()
     end
     local n = Pages()
     pager.text:SetText(page .. " / " .. n)
@@ -397,7 +479,7 @@ local function PaintDetail()
     local b, text, grey = detail.button, nil, false
     if worn then text, grey = it.kind == "motto" and "Wearing it" or "Equipped", true
     elseif st == "owned" then text = it.kind == "bobber" and "Equip" or "Wear it"
-    elseif st == "buy" then text = confirmFor == it and ("Buy for " .. it.price .. "?") or "Buy"
+    elseif st == "buy" then text = "Buy"
     elseif st == "short" then text, grey = ("Need %d more"):format(it.price - F.Balance()), true
     else text, grey = "Locked", true end
     b.text:SetText(text)
@@ -415,15 +497,14 @@ local function Press()
         if F.IsWorn(it) then return end
         F.Equip(it); Sound("on")
     elseif st == "buy" then
-        -- twice: once to ask, once to buy
-        if confirmFor ~= it then confirmFor = it; Sound("shopBuy"); Refresh(); return end
-        confirmFor = nil
         if F.Buy(it) then
             Sound("shopBought")
             Gurgle("thanks")
             Say(Pick(THANKS))
             if ns.Glint and detail.tile:IsShown() then ns.Glint(detail.tile, 6, 1.4) end
             if ns.Glint and detail.board:IsShown() then ns.Glint(detail.board, 6, 1.4) end
+            -- and the whole counter sparkles for a moment
+            if ns.Glint and detail.burst then ns.Glint(detail.burst, 28, 1.8, 1.6) end
         end
     elseif st == "short" then
         Sound("off"); Gurgle("short"); Say(Pick(SHORT), 0.3) -- a short, sad mumble
@@ -445,11 +526,12 @@ function Refresh()
     balance:SetText(ns.Flair.Balance())
     PaintShelf()
     PaintDetail()
+    if Shop.pad then Shop.pad:Paint() end
 end
 
 -- turn to a tab: at the front of Mrrl's shelf, or on the page with `it`
 local function OpenTab(k, it)
-    kind, confirmFor = k, nil
+    kind = k
     it = it or List()[1]
     selected = it
     local per = LAYOUT[k].cols * LAYOUT[k].rows
@@ -500,6 +582,7 @@ local function Build()
 
     -- the close button, painted on the top right post
     local close = CreateFrame("Button", nil, win)
+    Shop.close = close
     close:SetSize(44, 44)
     close:SetPoint("CENTER", win, "TOPLEFT", P(1473, 122))
     local chl = close:CreateTexture(nil, "HIGHLIGHT")
@@ -576,7 +659,7 @@ local function Build()
     plaque:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- the shelf's pages: the journal's arrows
-    cells = {}
+    cells, selFx = {}, nil
     pager = CreateFrame("Frame", nil, win)
     pager:SetAllPoints()
     pager.text = pager:CreateFontString(nil, "OVERLAY", UI.FONT.bold)
@@ -606,6 +689,12 @@ local function Build()
     detail.tile = UI.IconTile(detail, 170 * K, nil, false)
     detail.tile:SetPoint("TOP", win, "TOPLEFT", P(COUNTER_X, 470))
     detail.board = NewBoard(detail)
+    -- the counter, from the name down to the button: sparkles all over it when you buy
+    detail.burst = CreateFrame("Frame", nil, detail)
+    detail.burst:SetPoint("TOPLEFT", win, "TOPLEFT", P(COUNTER_X - 210, 400))
+    detail.burst:SetPoint("BOTTOMRIGHT", win, "TOPLEFT", P(COUNTER_X + 210, 830))
+    detail.burst:SetFrameLevel((detail:GetFrameLevel() or 1) + 20)
+    detail.burst:EnableMouse(false)
     detail.board:SetPoint("CENTER", win, "TOPLEFT", P(COUNTER_X, 560))
     detail.lore = detail:CreateFontString(nil, "OVERLAY", UI.FONT.ink)
     detail.lore:SetPoint("TOP", win, "TOPLEFT", P(COUNTER_X, 655))
@@ -744,20 +833,47 @@ local function Build()
     win:SetScript("OnHide", function()
         Sound("shopClose")
         if Shop.Talk then Shop.Talk() end
-        confirmFor = nil
         if bubble then bubble:Hide() end
     end)
-    -- a controller: the D-pad walks the shelf, A picks and presses, the
-    -- shoulders change tab, B closes
+    -- a controller: the D-pad walks the shelf (and on to the next page), X
+    -- presses the counter's button, the shoulders change tab, B closes. Each
+    -- has a badge on the thing it works, with the Gamepad UI on.
+    local function Walk(dir)
+        local list = List()
+        if #list == 0 then return end
+        local cols = LAYOUT[kind].cols
+        local at = 1
+        for i, x in ipairs(list) do if x == selected then at = i end end
+        local step = ({ up = -cols, down = cols, left = -1, right = 1 })[dir] or 0
+        local to = at + step
+        if to < 1 or to > #list then return end
+        local per = cols * LAYOUT[kind].rows
+        local was = page
+        page = math.ceil(to / per)
+        Sound(page ~= was and "shopPage" or "tick")
+        Select(list[to])
+    end
+    Shop.Walk = Walk
     Shop.pad = ns.Pad.Attach(win, {
         roots = function() return { win } end,
+        move = Walk,
+        noSelect = true,
+        extra = { button = "PAD3", fn = function() Press() end },
         pages = function(dir)
             local list, at = ns.Flair.KINDS, 1
             for i, k in ipairs(list) do if k == kind then at = i end end
             at = (at - 1 + dir) % #list + 1
             Sound("shopPage"); OpenTab(list[at])
         end,
-        pagesLabel = "Tabs",
+        -- the buttons' badges: on the things they work
+        badges = function(nav)
+            nav:Badge(tabs[1], "PADLSHOULDER", "LEFT", -24, -4, 30)
+            nav:Badge(tabs[#tabs], "PADRSHOULDER", "RIGHT", 24, -4, 30)
+            nav:Badge(detail.button, "PAD3", "TOPLEFT", 4, -4, 26, function()
+                return selected and detail:IsShown() and not detail.button.grey
+            end)
+            nav:Badge(Shop.close, "PAD2", "TOPLEFT", 2, -2, 22)
+        end,
     })
     ns.Flair.OnChange(function() if win:IsShown() then Refresh() end end)
 end

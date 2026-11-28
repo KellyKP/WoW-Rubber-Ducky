@@ -25,7 +25,15 @@ local THUMB = { 959, 335, 735, 60, 120 } -- x, top and bottom of its travel, w, 
 -- the little framed box for your Fishbone luck, shown only while you have some
 local BUFF = { 103, 803, 126, 118 } -- Log\buffbox, 128 square
 local BUFF_ICON = { 125, 821, 207, 900 } -- the icon fills it to the wood, rivets and all
+local TACKLE = { 872, 912, 74 } -- the tackle box by the duck: centre, size (opens the tackle wheel)
 local CATTAILS = { 138, 711, 70 } -- drawn over the last row (Log\cattails, 128 square)
+-- the challenge you're tracking: a progress bar on the wooden plank at the
+-- bottom, between its two fishbones. The gold-rimmed tube stays put; the blue
+-- glass fills inside it (Log\trackbar: the tube on top, the blue glass below)
+local TRACK_BAR = { 507, 971, 226, 40 } -- centre, width, height
+local TB_CAP = 28 / 256                -- the tube's rounded ends, kept as they are
+local TB_IN = { 27 / 256, 25 / 89 }    -- where the inside starts, across and down
+local TB_GLASS_CAP = 12 / 256          -- the glass's own rounded ends
 local NAME_W = COL_LOOT[2] - COL_LOOT[1] - 93 -- room for the name after the icon
 
 local FONT = ns.MEDIA .. "Fonts\\PatrickHand-Regular.ttf"
@@ -299,6 +307,94 @@ local function Build()
     Log.carved = ns.CarvedText(over, TITLE_TEXT, TITLE[3] * K)
     Log.title = Log.carved.letters
 
+    -- the tracked challenge's bar
+    local tb = CreateFrame("Frame", nil, win)
+    tb:SetFrameLevel(win:GetFrameLevel() + 6)
+    tb:SetSize(TRACK_BAR[3] * K, TRACK_BAR[4] * K)
+    tb:SetPoint("CENTER", win, "TOPLEFT", P(TRACK_BAR[1], TRACK_BAR[2]))
+    -- three pieces each, so the round ends stay round however long it is
+    local function Three(parent, layer, v0, v1, capTex, capW)
+        local t = {}
+        for i, part in ipairs({ { 0, capTex }, { capTex, 1 - capTex }, { 1 - capTex, 1 } }) do
+            local x = parent:CreateTexture(nil, layer)
+            x:SetTexture(ns.MEDIA .. "Log\\trackbar")
+            x:SetTexCoord(part[1], part[2], v0, v1)
+            t[i] = x
+        end
+        t[1]:SetPoint("TOPLEFT"); t[1]:SetPoint("BOTTOMLEFT"); t[1]:SetWidth(capW)
+        t[3]:SetPoint("TOPRIGHT"); t[3]:SetPoint("BOTTOMRIGHT"); t[3]:SetWidth(capW)
+        t[2]:SetPoint("TOPLEFT", t[1], "TOPRIGHT"); t[2]:SetPoint("BOTTOMRIGHT", t[3], "BOTTOMLEFT")
+        return t
+    end
+    local W, H = TRACK_BAR[3] * K, TRACK_BAR[4] * K
+    local capW = H * (TB_CAP * 256) / 89
+    Three(tb, "BACKGROUND", 0, 89 / 256, TB_CAP, capW) -- the tube, the whole width
+    -- the glass, inside it, filling from the left
+    local ix, iy = capW * TB_IN[1] / TB_CAP, H * TB_IN[2]
+    local well = CreateFrame("Frame", nil, tb)
+    well:SetPoint("TOPLEFT", ix, -iy); well:SetPoint("BOTTOMRIGHT", -ix, iy)
+    well:SetFrameLevel(tb:GetFrameLevel() + 1)
+    local glass = CreateFrame("Frame", nil, well)
+    glass:SetPoint("TOPLEFT"); glass:SetPoint("BOTTOMLEFT")
+    local gh = H - iy * 2
+    local gcap = gh * (TB_GLASS_CAP * 256) / 49
+    Three(glass, "ARTWORK", 128 / 256, 177 / 256, TB_GLASS_CAP, gcap)
+    tb.full = { holder = glass, cap = gcap, room = W - ix * 2 }
+    function tb.full:Fill(f) self.holder:SetWidth(math.max(self.cap * 2, self.room * f)) end
+    -- the count, on top of both
+    local words = CreateFrame("Frame", nil, tb)
+    words:SetAllPoints(); words:SetFrameLevel(tb:GetFrameLevel() + 3)
+    tb.text = words:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    tb.text:SetPoint("CENTER", 0, 0)
+    local tf = tb.text:GetFont()
+    if tf then tb.text:SetFont(tf, 10, "OUTLINE") end
+    tb:EnableMouse(true)
+    tb:SetScript("OnEnter", function(self)
+        local c = self.c
+        if not c and self.skill then
+            -- nothing tracked: it's showing your fishing skill
+            local k = self.skill
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine("Fishing skill", 1, 0.82, 0)
+            GameTooltip:AddLine(("%d / %d"):format(k.rank, k.max), 1, 1, 1)
+            if k.mod > 0 then GameTooltip:AddLine(("+%d from lures, gear and food: %d in all"):format(k.mod, k.rank + k.mod), 0.18, 0.8, 0.18) end
+            if ns.Rank and ns.Rank.Ready and ns.Rank.Ready() then
+                GameTooltip:AddLine("As high as it goes for now: see a trainer to learn the next rank.", 1, 0.5, 0.25, true)
+            end
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("Track a challenge to show it here instead.", 0.5, 0.5, 0.5, true)
+            GameTooltip:Show()
+            return
+        end
+        if not c then return end
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(c.def.name, 1, 0.82, 0)
+        GameTooltip:AddLine(c.def.goal, 1, 1, 1, true)
+        if c.need > 1 then GameTooltip:AddLine(("%d / %d"):format(c.have, c.need), 0.7, 0.7, 0.7) end
+        -- what it pays
+        local F = ns.Flair
+        local pay = F and F.REWARD[c.def.id]
+        local prizes = F and F.Prizes(c.def.id) or {}
+        if pay or prizes[1] then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("Earns:", 0.7, 0.7, 0.7)
+            if pay then GameTooltip:AddLine(F.Bones(pay) .. " Shiny Fishbones", 1, 1, 1) end
+            for _, it in ipairs(prizes) do GameTooltip:AddLine(it.name .. " " .. F.SINGULAR[it.kind], 1, 0.82, 0) end
+        end
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Click to see it in Ducky's Challenges.", 0.5, 0.5, 0.5)
+        GameTooltip:Show()
+    end)
+    tb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    tb:SetScript("OnMouseUp", function(self)
+        -- the skill has nothing to open: the Professions window opened from here
+        -- would carry our mark and get protected things in it blocked
+        if not self.c then return end
+        if self.c and ns.ChallengesWindow then ns.ChallengesWindow:Show(self.c.def.group) end
+    end)
+    tb:Hide()
+    Log.trackBar = tb
+
     buff = CreateFrame("Frame", nil, win)
     buff:SetFrameLevel(win:GetFrameLevel() + 6)
     buff:SetSize(BUFF[3] * K, BUFF[4] * K)
@@ -308,6 +404,30 @@ local function Build()
     box:SetTexture(ns.MEDIA .. "Log\\buffbox")
     box:SetTexCoord(0, BUFF[3] / 128, 0, BUFF[4] / 128)
     buff:Hide()
+
+    -- the duck's tackle box: opens the tackle wheel
+    local tbox = CreateFrame("Button", nil, win)
+    tbox:SetFrameLevel(win:GetFrameLevel() + 7)
+    tbox:SetSize(TACKLE[3] * K, TACKLE[3] * K)
+    tbox:SetPoint("CENTER", win, "TOPLEFT", P(TACKLE[1], TACKLE[2]))
+    local tart = tbox:CreateTexture(nil, "ARTWORK")
+    tart:SetAllPoints()
+    tart:SetTexture(ns.MEDIA .. "Tackle\\box")
+    local thl = tbox:CreateTexture(nil, "HIGHLIGHT")
+    thl:SetAllPoints()
+    thl:SetTexture(ns.MEDIA .. "Tackle\\box")
+    thl:SetBlendMode("ADD")
+    thl:SetAlpha(0.35)
+    tbox:SetScript("OnClick", function() if ns.Tackle then ns.Tackle:Toggle() end end)
+    tbox:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("Tackle wheel")
+        GameTooltip:AddLine("Put a lure on your pole, or visit Mrrl's or your challenges.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    tbox:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    tbox:SetShown(ns.db.tackleOnLog ~= false)
+    Log.tackleButton = tbox
 
     scroll = CreateFrame("Frame", nil, win)
     scroll:SetFrameLevel(win:GetFrameLevel() + 6)
@@ -540,6 +660,56 @@ function Log.Scroll(step)
 end
 function Log.Top() return top end
 
+-- your fishing skill: rank, cap, and what lures, gear and food add
+function Log.Skill()
+    if not (GetProfessions and GetProfessionInfo) then return nil end
+    local _, _, _, fishing = ns.Safe(GetProfessions)
+    if not fishing then return nil end
+    local ok, _, _, rank, max, _, _, _, mod = pcall(GetProfessionInfo, fishing)
+    if not ok or not rank or not max or max <= 0 then return nil end
+    return { rank = rank, max = max, mod = mod or 0 }
+end
+
+-- the tracked challenge: fills as it goes; when it's done it says so, then clears.
+-- With nothing tracked it shows your fishing skill instead.
+function Log.UpdateTrack()
+    local tb = Log.trackBar
+    if not tb then return end
+    local CH = ns.Challenges
+    local c = CH and CH.Tracked and CH.Tracked()
+    tb.c = c
+    tb.skill = nil
+    if not c then
+        local k = Log.Skill()
+        if not k then tb:Hide(); return end
+        tb.skill = k
+        local frac = math.min(1, k.rank / k.max)
+        tb.full:Fill(frac)
+        tb.full.holder:SetShown(frac > 0)
+        tb.text:SetText(("Fishing %d/%d"):format(k.rank, k.max)
+            .. (k.mod > 0 and (" |cff60e060+%d|r"):format(k.mod) or ""))
+        tb:Show()
+        return
+    end
+    local frac = c.done and 1 or (c.need > 0 and c.have / c.need or 0)
+    tb.full:Fill(frac)
+    tb.full.holder:SetShown(frac > 0)
+    if c.done then
+        tb.text:SetText("Done!")
+        if not tb.clearing and C_Timer then
+            tb.clearing = true
+            C_Timer.After(4, function()
+                tb.clearing = nil
+                local now = CH.Tracked()
+                if now and now.done then CH.Track(nil) end
+            end)
+        end
+    else
+        tb.text:SetText(c.need > 1 and (c.have .. "/" .. c.need) or "")
+    end
+    tb:Show()
+end
+
 -- Flair's luck icon goes in the framed box; the box only shows while there's luck
 function Log.LuckSlot(b, on)
     if not win then return end
@@ -614,11 +784,14 @@ function Log:Show()
     if not win then Build() end
     Place()
     LayoutTitle()
+    Log.UpdateTrack()
     self:Refresh()
     win:Show()
     if ns.Social then ns.Social:LogBoard() end -- your quarterboard hangs off the top
     if ns.Flair then ns.Safe(ns.Flair.LuckIcon) end -- and your Fishbone luck beside it
+    if ns.Rank then ns.Safe(ns.Rank.Update) end -- and a new fishing rank, when one's waiting
 end
+function Log.Frame() return win end
 
 function Log:Hide() if win then win:Hide() end end
 -- loud: you pressed something, so say why nothing opened
@@ -663,12 +836,11 @@ function ns.PickupMacro(name, icon, body, what)
     end
     local function Later(i)
         C_Timer.After(0.1, function()
-            local j = ns.Safe(GetMacroIndexByName, name)
-            Grab((j and j > 0) and j or i)
+            Grab(ns.MacroIndex(name) or i)
         end)
     end
-    local i = ns.Safe(GetMacroIndexByName, name)
-    if i and i > 0 then
+    local i = ns.MacroIndex(name)
+    if i then
         -- an older one of ours with a blank icon: give it its icon back first
         local _, has = ns.Safe(GetMacroInfo, i)
         if has ~= icon then
@@ -687,7 +859,7 @@ function ns.PickupMacro(name, icon, body, what)
 end
 
 Log.MACRO_ICON = "Interface\\Icons\\INV_Misc_Note_01"
-function Log:PickupMacro() ns.PickupMacro("Ducky Log", Log.MACRO_ICON, "/ducky log", "log") end
+function Log:PickupMacro() ns.PickupMacro("Log", Log.MACRO_ICON, "/ducky log", "log") end
 
 -- An on-screen launcher button: drag it anywhere, right-click to lock it. Off by default.
 -- Used for the log and the journal. o = { name, art, title, show, locked, size, pos (db keys),
@@ -786,6 +958,16 @@ local function PoleCheck()
     quiet = false
 end
 Log.PoleCheck = PoleCheck
+
+-- the skill on the bar keeps up as it rises (and as lures come and go)
+local skillWatch = CreateFrame("Frame")
+skillWatch:RegisterEvent("SKILL_LINES_CHANGED")
+skillWatch:RegisterEvent("CHAT_MSG_SKILL")
+skillWatch:RegisterEvent("UNIT_INVENTORY_CHANGED")
+skillWatch:SetScript("OnEvent", function(_, event, unit)
+    if event == "UNIT_INVENTORY_CHANGED" and unit ~= "player" then return end
+    if win and win:IsShown() then Log.UpdateTrack() end
+end)
 
 local watch = CreateFrame("Frame")
 watch:RegisterEvent("PLAYER_LOGIN")

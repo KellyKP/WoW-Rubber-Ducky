@@ -1,6 +1,6 @@
--- Rubber Ducky: fixed data for the fishing journal.
--- The tables marked "to fill" come from Wowhead / warcraft.wiki.gg; until then
--- the journal shows what you've caught, and nothing is "???".
+-- Rubber Ducky: fixed data for the fishing journal: every fish, everything
+-- else that comes up on the line, the zones, and Ducky's lines. Most of it is
+-- from Wowhead's Forever data (see the notes on each table).
 
 local _, ns = ...
 local Data = {}
@@ -25,7 +25,6 @@ Data.FISH = {
     [8365] = { zones = { "Thousand Needles", "Arathi Highlands", "Shen'dralas", "Desolace", "Alterac Mountains", "Dustwallow Marsh" } }, -- Raw Mithril Head Trout
     [21153] = { zones = { "Alterac Mountains", "Riverglades", "Stranglethorn Vale" } }, -- Raw Greater Sagefish
     [4603] = { zones = { "Azshara", "Tanaris", "Swamp of Sorrows", "The Hinterlands", "Stranglethorn Vale", "Dustwallow Marsh" } }, -- Raw Spotted Yellowtail
-    [7973] = { zones = { "Tanaris", "The Hinterlands", "Azshara", "Feralas" } }, -- Big-mouth Clam
     [13422] = { zones = { "Azshara", "Tanaris", "Riverglades", "The Hinterlands", "Feralas", "Stranglethorn Vale" } }, -- Stonescale Eel
     [13754] = { zones = { "Azshara", "Tanaris", "The Hinterlands", "Feralas" } }, -- Raw Glossy Mightfish
     [13755] = { zones = { "Tanaris", "Azshara", "The Hinterlands", "Feralas" } }, -- Raw Winter Squid
@@ -47,6 +46,24 @@ Data.FISH = {
     [19806] = { zones = { "Stranglethorn Vale" } }, -- Dezian Queenfish
     [19807] = { zones = { "Stranglethorn Vale" } }, -- Speckled Tastyfish
     [13756] = { zones = { "Tanaris", "Azshara", "The Hinterlands", "Feralas" } }, -- Raw Summer Bass (seasonal; ID from Classic, not logged yet)
+
+    -- Bloated fish: open them for what they swallowed
+    [6643] = { zones = { "Zephras Isle", "Elwynn Forest", "Tirisfal Glades", "Dun Morogh", "Mulgore", "Durotar" } }, -- Bloated Brilliant Smallfish
+    [6645] = { zones = { "Stormwind City", "Orgrimmar", "Thunder Bluff", "Undercity", "Ironforge", "The Barrens" } }, -- Bloated Mud Snapper
+    [6647] = { zones = { "Stonetalon Mountains", "Redridge Mountains", "Hillsbrad Foothills", "Ashenvale", "Wetlands", "Mount Hyjal" } }, -- Bloated Bristle Whisker Catfish
+    [8366] = { zones = { "Stranglethorn Vale", "Arathi Highlands", "Desolace", "Riverglades", "Dustwallow Marsh", "Mount Hyjal" } }, -- Bloated Mithril Head Trout
+    [13881] = { zones = { "Hillsbrad Foothills", "Stonetalon Mountains", "Feralas", "Ashenvale", "Western Plaguelands", "Wetlands" } }, -- Bloated Redgill
+    [13891] = { zones = { "Mount Hyjal", "Moonglade" } }, -- Bloated Whitescale Salmon
+    [21162] = { zones = { "Azshara" } }, -- Bloated Oily Blackmouth
+    [21164] = { zones = { "Alterac Mountains", "Stranglethorn Vale", "Mount Hyjal" } }, -- Bloated Rockscale Cod
+    [21243] = { zones = { "Tanaris", "Riverglades" } }, -- Bloated Glossy Mightfish
+
+    -- the odd ones: grey vendor fish and a Stranglethorn quest fish
+    [6360] = { zones = { "Hillsbrad Foothills" } }, -- Steelscale Crushfish
+    [1467] = { zones = { "Redridge Mountains" } }, -- Spotted Sunfish
+    [6458] = { zones = { "Stonetalon Mountains", "The Barrens" } }, -- Oil Covered Fish
+    [19975] = { zones = { "Hillsbrad Foothills", "Winterspring" } }, -- Zulian Mudskunk
+    [19808] = { zones = { "Stranglethorn Vale" } }, -- Rockhide Strongfish (Fishing Extravaganza; not logged on Wowhead Forever yet)
 }
 
 -- Everything else that comes up on the line: [itemID] = { group, zones by how often }
@@ -58,7 +75,6 @@ Data.FINDS = {
     [6718] = { "treasure", zones = { "Darkshore" } }, -- Electropeller
     [21228] = { "treasure", zones = { "Stranglethorn Vale", "Tanaris", "Riverglades", "Feralas", "Azshara", "Mount Hyjal" } }, -- Mithril Bound Trunk
     [6717] = { "treasure", zones = { "Darkshore" } }, -- Gaffer Jack
-    [1467] = { "treasure", zones = { "Redridge Mountains" } }, -- Spotted Sunfish
     [20709] = { "treasure", zones = { "The Barrens", "Darkshore", "Westfall", "Silverpine Forest", "Loch Modan", "Redridge Mountains" } }, -- Rumsey Rum Light
     [21151] = { "treasure", zones = { "Stranglethorn Vale", "Riverglades", "Alterac Mountains", "Tanaris", "Dustwallow Marsh", "Desolace" } }, -- Rumsey Rum Black Label
     [21114] = { "treasure", zones = { "Hillsbrad Foothills", "Stonetalon Mountains", "Wetlands", "Ashenvale" } }, -- Rumsey Rum Dark
@@ -73,31 +89,21 @@ Data.FINDS = {
     [6351] = { "treasure", zones = { "Darkshore", "The Barrens", "Westfall", "Stormwind City", "Silverpine Forest" } }, -- Dented Crate
     [6356] = { "treasure", zones = { "Durotar", "Teldrassil", "Tirisfal Glades" } }, -- Battered Chest
     [6311] = { "treasure", zones = { "Redridge Mountains", "Orgrimmar", "Stormwind City", "Stonetalon Mountains", "Desolace", "Ashenvale" } }, -- 22 Pound Catfish
-    [6458] = { "treasure", zones = { "Stonetalon Mountains", "The Barrens" } }, -- Oil Covered Fish
-    [6643] = { "treasure", zones = { "Zephras Isle", "Elwynn Forest", "Tirisfal Glades", "Dun Morogh", "Mulgore", "Durotar" } }, -- Bloated Brilliant Smallfish
     [6354] = { "treasure", zones = { "Wetlands", "Ashenvale", "Hillsbrad Foothills" } }, -- Small Locked Chest
     [6352] = { "treasure", zones = { "Wetlands", "Hillsbrad Foothills", "Ashenvale" } }, -- Waterlogged Crate
-    [6645] = { "treasure", zones = { "Stormwind City", "Orgrimmar", "Thunder Bluff", "Undercity", "Ironforge", "The Barrens" } }, -- Bloated Mud Snapper
-    [13881] = { "treasure", zones = { "Hillsbrad Foothills", "Stonetalon Mountains", "Feralas", "Ashenvale", "Western Plaguelands", "Wetlands" } }, -- Bloated Redgill
     [6295] = { "treasure", zones = { "Elwynn Forest", "Zephras Isle", "Mulgore", "Dun Morogh", "Tirisfal Glades", "Durotar" } }, -- 15 Pound Mud Snapper
     [13875] = { "treasure", zones = { "Tanaris", "Azshara", "Feralas" } }, -- Ironbound Locked Chest
-    [6647] = { "treasure", zones = { "Stonetalon Mountains", "Redridge Mountains", "Hillsbrad Foothills", "Ashenvale", "Wetlands", "Mount Hyjal" } }, -- Bloated Bristle Whisker Catfish
     [13874] = { "treasure", zones = { "Tanaris", "Stranglethorn Vale", "Feralas", "Azshara" } }, -- Heavy Crate
     [13876] = { "treasure", zones = { "Tanaris", "The Hinterlands", "Feralas", "Azshara" } }, -- 40 Pound Yellowtail
     [13877] = { "treasure", zones = { "Tanaris", "Feralas", "Azshara" } }, -- 47 Pound Yellowtail
-    [8366] = { "treasure", zones = { "Stranglethorn Vale", "Arathi Highlands", "Desolace", "Riverglades", "Dustwallow Marsh", "Mount Hyjal" } }, -- Bloated Mithril Head Trout
     [13885] = { "treasure", zones = { "Feralas", "Western Plaguelands", "Desolace", "Eastern Plaguelands" } }, -- 34 Pound Redgill
     [6363] = { "treasure", zones = { "Ashenvale", "Wetlands", "Dustwallow Marsh", "Arathi Highlands", "Redridge Mountains", "Desolace" } }, -- 26 Pound Catfish
     [13886] = { "treasure", zones = { "Feralas", "The Hinterlands", "Eastern Plaguelands", "Desolace", "Western Plaguelands" } }, -- 37 Pound Redgill
-    [21243] = { "treasure", zones = { "Tanaris", "Riverglades" } }, -- Bloated Glossy Mightfish
     [13878] = { "treasure", zones = { "Tanaris", "Feralas" } }, -- 53 Pound Yellowtail
-    [21164] = { "treasure", zones = { "Alterac Mountains", "Stranglethorn Vale", "Mount Hyjal" } }, -- Bloated Rockscale Cod
     [13882] = { "treasure", zones = { "Feralas", "Ashenvale", "Moonglade" } }, -- 42 Pound Redgill
     [13905] = { "treasure", zones = { "Eastern Plaguelands", "Winterspring", "Mount Hyjal" } }, -- 29 Pound Salmon
     [6364] = { "treasure", zones = { "Arathi Highlands", "Redridge Mountains", "Ashenvale" } }, -- 32 Pound Catfish
     [13879] = { "treasure", zones = { "Tanaris" } }, -- 59 Pound Yellowtail
-    [19975] = { "treasure", zones = { "Hillsbrad Foothills", "Winterspring" } }, -- Zulian Mudskunk
-    [13891] = { "treasure", zones = { "Mount Hyjal", "Moonglade" } }, -- Bloated Whitescale Salmon
     [13902] = { "treasure", zones = { "Stormwind City", "Silithus" } }, -- 18 Pound Salmon
     [13904] = { "treasure", zones = { "Eastern Plaguelands", "Mount Hyjal" } }, -- 25 Pound Salmon
     [17058] = { "treasure", zones = { "Desolace", "Riverglades" } }, -- Fish Oil
@@ -107,8 +113,6 @@ Data.FINDS = {
     [17057] = { "treasure", zones = { "Desolace" } }, -- Shiny Fish Scales
     [13887] = { "treasure", zones = { "Un'Goro Crater" } }, -- 52 Pound Redgill
     [13903] = { "treasure", zones = { "Duskwood" } }, -- 22 Pound Salmon
-    [21162] = { "treasure", zones = { "Azshara" } }, -- Bloated Oily Blackmouth
-    [6360] = { "treasure", zones = { "Hillsbrad Foothills" } }, -- Steelscale Crushfish
     [6297] = { "junk", zones = { "Undercity", "Tirisfal Glades", "Silverpine Forest", "Ashenvale", "Westfall", "Alterac Mountains" } }, -- Old Skull
     [6301] = { "junk", zones = { "Tirisfal Glades", "Undercity", "Silverpine Forest" } }, -- Old Teamster's Skull
     [6457] = { "junk", zones = { "Stonetalon Mountains" } }, -- Rusted Engineering Parts
@@ -116,11 +120,12 @@ Data.FINDS = {
     [6455] = { "junk", zones = { "The Barrens" } }, -- Old Wagonwheel
     [6306] = { "junk", zones = { "Ashenvale" } }, -- Damp Diary Page (Day 512)
     [770] = { "junk", zones = { "Stranglethorn Vale" } }, -- Pointy Crocolisk Tooth
+    [7973] = { "treasure", zones = { "Tanaris", "The Hinterlands", "Azshara", "Feralas" } }, -- Big-mouth Clam (a shellfish: you open it for a pearl)
 }
 
--- Zone level range (Wowhead Forever) and fishing skill: cast from, nothing gets away from.
--- Fishing skill is Classic's (no Forever numbers published yet); nil = not known (new zones).
--- Not shown anywhere until we've checked Forever's own (docs/zone-skill-plan.md).
+-- Zone level range and fishing skill (Wowhead's Forever fishing guide): the skill you
+-- need to fish there at all, and the skill where every cast catches. nil = no water,
+-- or not in the guide (Riverglades, Mount Hyjal).
 Data.ZONES = {
     ["Alterac Mountains"] = { 27, 39, 130, 225 },
     ["Arathi Highlands"] = { 30, 40, 130, 225 },
@@ -169,8 +174,15 @@ Data.ZONES = {
     ["Westfall"] = { 9, 18, 1, 75 },
     ["Wetlands"] = { 20, 30, 55, 150 },
     ["Winterspring"] = { 55, 60, 330, 425 },
-    ["Zephras Isle"] = { 1, 12 },
+    ["Zephras Isle"] = { 1, 12, 1, 25 },
     ["Mount Hyjal"] = { 55, 60 },   -- level range a guess: Forever's endgame zone
+}
+
+-- Spots that need more than the rest of their zone (fish from, every cast catches)
+Data.SUBZONES = {
+    ["Jaguero Isle"] = { 205, 300 },
+    ["Bay of Storms"] = { 330, 425 }, ["Hetaera's Clutch"] = { 330, 425 }, ["Scalebeard's Cave"] = { 330, 425 },
+    ["Jademir Lake"] = { 330, 425 },
 }
 
 -- Faction territory (Wowhead Forever); anything not listed is contested
@@ -420,6 +432,93 @@ Data.PUNS = {
     [19805] = { -- Keefer's Angelfish
         "An angel! Keefer will be thrilled.",
         ["Stranglethorn Vale"] = "Tournament angel! Get it to Booty Bay!",
+    },
+    [6643] = { -- Bloated Brilliant Smallfish
+        "Small fish, big appetite. Open wide!",
+        ["Zephras Isle"] = "Island snacking. Something's in there!",
+        ["Elwynn Forest"] = "Elwynn's finest overeater. Pop it open!",
+        ["Tirisfal Glades"] = "Even the fish here are stuffed. Spooky.",
+        ["Dun Morogh"] = "Puffed up against the cold. Smart fish.",
+        ["Mulgore"] = "A plains fish that ate the plains.",
+        ["Durotar"] = "Durotar's toughest little glutton.",
+    },
+    [6645] = { -- Bloated Mud Snapper
+        "Swallowed something shiny, I bet.",
+        ["Stormwind City"] = "City fish, city appetite.",
+        ["Orgrimmar"] = "Ate its way through the canals!",
+        ["Thunder Bluff"] = "From the pools up high, puffed up proud.",
+        ["Undercity"] = "What has it been eating down here?!",
+        ["Ironforge"] = "A forge-fed feast in there.",
+        ["The Barrens"] = "Barrens fish don't skip meals.",
+    },
+    [6647] = { -- Bloated Bristle Whisker Catfish
+        "Whiskers and a full belly. Classic catfish.",
+        ["Stonetalon Mountains"] = "Mountain catfish, mountain-sized lunch.",
+        ["Redridge Mountains"] = "Redridge's roundest resident.",
+        ["Hillsbrad Foothills"] = "Stuffed full of Hillsbrad goodies.",
+        ["Ashenvale"] = "Ate half the forest floor, by the looks.",
+        ["Wetlands"] = "Swamp-fed and swollen. Lovely.",
+        ["Mount Hyjal"] = "Even on the holy mountain, it overate.",
+    },
+    [8366] = { -- Bloated Mithril Head Trout
+        "Mithril head, treasure belly!",
+        ["Stranglethorn Vale"] = "A jungle trout with jungle loot inside.",
+        ["Arathi Highlands"] = "Highland trout, hearty helping.",
+        ["Desolace"] = "Found something to eat in Desolace. Impressive.",
+        ["Riverglades"] = "A Riverglades trout full of surprises.",
+        ["Dustwallow Marsh"] = "Marsh-stuffed and ready to pop.",
+        ["Mount Hyjal"] = "A sacred trout. Sacredly stuffed.",
+    },
+    [13881] = { -- Bloated Redgill
+        "Red gills, round belly. Open it up!",
+        ["Hillsbrad Foothills"] = "Hillsbrad redgill, full to the brim.",
+        ["Stonetalon Mountains"] = "Stuffed with Stonetalon pebbles? Let's see!",
+        ["Feralas"] = "Feralas feasting at its finest.",
+        ["Ashenvale"] = "An Ashenvale glutton. Respect.",
+        ["Western Plaguelands"] = "I'd check what it ate here. Carefully.",
+        ["Wetlands"] = "A wet, round, wonderful redgill.",
+    },
+    [13891] = { -- Bloated Whitescale Salmon
+        "A salmon with a secret in its tummy.",
+        ["Mount Hyjal"] = "Mountain salmon, mountain of loot?",
+        ["Moonglade"] = "Moonlit and well fed. Peek inside!",
+    },
+    [21162] = { -- Bloated Oily Blackmouth
+        "Oily, bloated and suspicious. Perfect.",
+        ["Azshara"] = "Azshara's slickest snack-eater.",
+    },
+    [21164] = { -- Bloated Rockscale Cod
+        "Rocks in its scales, treasure in its belly.",
+        ["Alterac Mountains"] = "An Alterac cod that ate well. Good for it.",
+        ["Stranglethorn Vale"] = "Jungle cod, jungle-sized meal.",
+        ["Mount Hyjal"] = "Cod on the mountain? And stuffed, too!",
+    },
+    [21243] = { -- Bloated Glossy Mightfish
+        "Shiny outside, shinier inside, hopefully.",
+        ["Tanaris"] = "A desert-coast mightfish, munched to bursting.",
+        ["Riverglades"] = "Glossy, mighty and very, very full.",
+    },
+    [6360] = { -- Steelscale Crushfish
+        "Steel scales! Don't bite down.",
+        ["Hillsbrad Foothills"] = "Hillsbrad's heavy-metal fish.",
+    },
+    [1467] = { -- Spotted Sunfish
+        "A little spotted sunbeam.",
+        ["Redridge Mountains"] = "Sunshine in the Redridge rivers.",
+    },
+    [6458] = { -- Oil Covered Fish
+        "Ew. Someone's been spilling in the water.",
+        ["Stonetalon Mountains"] = "Venture Co. mess, I'd wager. Poor thing.",
+        ["The Barrens"] = "The oil fields leak. This fish knows.",
+    },
+    [19975] = { -- Zulian Mudskunk
+        "Smells like Zul'Gurub. Hold your beak.",
+        ["Hillsbrad Foothills"] = "A mudskunk in Hillsbrad? Long way from home!",
+        ["Winterspring"] = "A frozen mudskunk. Smells less, at least.",
+    },
+    [19808] = { -- Rockhide Strongfish
+        "Rock-hard and proud of it. Mind your fingers.",
+        ["Stranglethorn Vale"] = "A tournament heavyweight! Off to Booty Bay with it!",
     },
     [19806] = { -- Dezian Queenfish
         "Bow before the queen! Of fish.",

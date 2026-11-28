@@ -319,13 +319,30 @@ local CREST = {
 }
 local function Crest(zone) return CREST[Data.FACTION[zone] or ""] or "" end
 Journal.Crest = Crest
+-- your fishing skill, with your pole, lure and gear (nil if you haven't learned it)
+function Journal.FishingSkill()
+    if not (GetProfessions and GetProfessionInfo) then return nil end
+    local _, _, _, fishing = ns.Safe(GetProfessions)
+    if not fishing then return nil end
+    local ok, _, _, rank, _, _, _, _, mod = pcall(GetProfessionInfo, fishing)
+    if not ok or not rank then return nil end
+    return rank + (mod or 0)
+end
+-- the skill a zone needs, coloured against yours: red, you can't fish here yet;
+-- orange, some will get away; plain, every cast catches
+local function SkillText(z)
+    if not (z and z[3]) then return "" end
+    local text = ("Fishing %d-%d"):format(z[3], z[4])
+    local mine = Journal.FishingSkill()
+    if mine and mine < z[3] then return " · |cffd04030" .. text .. "|r"
+    elseif mine and mine < z[4] then return " · |cffd08a20" .. text .. "|r" end
+    return " · " .. text
+end
+Journal.SkillText = SkillText
 local function ZoneLabel(zone)
     local z = Levels(zone)
     if not z then return Crest(zone) .. zone end
-    local text = ("%s%s · Lv %d-%d"):format(Crest(zone), zone, z[1], z[2])
-    -- (no fishing skill here yet: the numbers we have are Classic's, and may not
-    -- be Forever's; see docs/zone-skill-plan.md)
-    return text
+    return ("%s%s · Lv %d-%d"):format(Crest(zone), zone, z[1], z[2]) .. SkillText(z)
 end
 -- the order you'd travel in: by level (zones we know nothing about go last)
 local function ZoneRank(zone)
@@ -690,6 +707,16 @@ local function Build()
     corner:SetSize(128 * K, 256 * K)
     corner:SetPoint("TOPLEFT", win, "TOPLEFT", P(98, 715))
 
+    -- where the little list sits (on Waters, A walks it and X opens one)
+    win.boxSpot = CreateFrame("Frame", nil, ui)
+    win.boxSpot:SetPoint("TOPLEFT", ui, "TOPLEFT", P(BOX[1], BOX[3]))
+    win.boxSpot:SetSize((BOX[2] - BOX[1]) * K, (BOX[4] - BOX[3]) * K)
+    win.boxSpot:EnableMouse(false)
+    -- where the map sits on the right page (A shows the next spot on it)
+    win.mapSpot = CreateFrame("Frame", nil, ui)
+    win.mapSpot:SetPoint("TOPLEFT", ui, "TOPLEFT", P(747, 447))
+    win.mapSpot:SetSize((933 - 747) * K, (624 - 447) * K)
+    win.mapSpot:EnableMouse(false)
     win.noMap = Text(40, "CENTER")
     win.noMap:SetPoint("CENTER", ui, "TOPLEFT", P((747 + 933) / 2, (447 + 624) / 2 + 8))
     win.noMap:SetText("???")
@@ -697,7 +724,7 @@ local function Build()
     win.noMap:SetAlpha(0.7)
 
     -- painted buttons
-    HotSpot(CLOSE[1] - CLOSE[3], CLOSE[2] - CLOSE[3], CLOSE[1] + CLOSE[3], CLOSE[2] + CLOSE[3],
+    win.closeBtn = HotSpot(CLOSE[1] - CLOSE[3], CLOSE[2] - CLOSE[3], CLOSE[1] + CLOSE[3], CLOSE[2] + CLOSE[3],
         function() win:Hide() end, "Close")
     win.ribbons = {}
     for _, r in ipairs(RIBBONS) do
@@ -728,7 +755,11 @@ local function Build()
     win:HookScript("OnShow", function() Pass(true) end)
     pcall(win.SetScript, win, "OnGamePadButtonDown", function(self, button)
         local f = Journal.PAD[button]
-        if f and not (win.notes and win.notes:HasFocus()) then
+        if win.notes and win.notes:HasFocus() and (button == "PAD4" or button == "PAD2") then
+            Pass(false)
+            win.notes:ClearFocus()
+            win.padBar:Paint()
+        elseif f and not (win.notes and win.notes:HasFocus()) then
             Pass(false)
             f()
         else
@@ -736,23 +767,51 @@ local function Build()
         end
     end)
 
-    -- the controls, on a bar under the book (only with a controller on), in the
-    -- game's own controller-hint style. On UIParent so it stays full size when
-    -- the journal is set small.
+    -- with a controller (only with the Gamepad UI on): each button's picture sits
+    -- on what it works: LB and RB by the ribbons, A on the map (or the list on
+    -- Waters), X on Sort (or the list), Y on the pencil, B on the close button.
+    -- View doesn't sit on anything, so it gets a little bar of its own beside the
+    -- ribbons. On UIParent so it stays full size when the journal is set small.
     local bar = ns.Pad.NewBar(win:GetFrameStrata() or "HIGH")
-    bar:SetPoint("TOP", win, "TOPLEFT", P(512, 1000))
-    function bar:Paint()
-        local list = { { "DPAD", "Browse" }, { "PADLSHOULDER", "PADRSHOULDER", "Bookmarks" } }
-        local function Add(btn, label) list[#list + 1] = { btn, label } end
-        if focus == "right" then Add("PAD1", "Select") elseif mode == "catches" or mode == "finds" then Add("PAD1", "Next spot") end
-        if (mode == "catches" or mode == "finds") and focus == "left" then Add("PAD3", "Sort") end
-        if mode == "finds" and focus == "left" then Add("PADRSTICK", "Show") end
-        if ns.ChallengesWindow then Add("PAD4", "Challenges") end
-        if focus == "right" then Add("PADBACK", "Left page") elseif BoxUsable() then Add("PADBACK", "Right page") end
-        Add("PAD2", "Close")
-        self:SetItems(list)
+    bar:SetPoint("LEFT", win, "TOPLEFT", P(575, 945))
+    local badges
+    local function Badges()
+        if badges then return badges end
+        local B = ns.Pad.Badge
+        local spots = function() return (mode == "catches" or mode == "finds") and focus == "left" end
+        local writing = function() return win.notes and win.notes:HasFocus() end
+        badges = {
+            B(win.ribbons[1], "PADLSHOULDER", "LEFT", -20, 14, 30),
+            B(win.ribbons[#win.ribbons], "PADRSHOULDER", "RIGHT", 20, 14, 30),
+            B(win.closeBtn, "PAD2", "TOPLEFT", 2, -2, 24),
+            B(win.sortBtn, "PAD3", "LEFT", -16, 0, 24, spots),
+            B(win.showBtn, "PADRSTICK", "RIGHT", 16, 0, 24, function() return mode == "finds" and focus == "left" end),
+            B(win.mapSpot, "PAD1", "TOPLEFT", 4, -4, 26, function() return spots() and win.spotKeys and #win.spotKeys > 1 end),
+            B(win.boxSpot, "PAD1", "TOPLEFT", 2, -2, 26, function() return mode == "waters" and BoxUsable() end),
+            -- X, small, beside the line A has walked to
+            B(win.boxSpot, "PAD3", "TOPRIGHT", 0, 0, 18, function() return mode == "waters" and box.walk and BoxUsable() end),
+            B(win.pencil, "PAD4", "TOPLEFT", 2, -2, 24, function() return win.notes.target ~= nil end),
+        }
+        return badges
     end
-    bar:SetScript("OnShow", bar.Paint)
+    function bar:Paint()
+        local on = ns.OneKey and ns.OneKey.GamepadUIOn()
+        for _, b in ipairs(Badges()) do b:Update() end
+        -- the X follows the walked-to line down the list
+        local x, line = badges[8], boxLines[box.cursor - box.offset]
+        if x:IsShown() and line then
+            x:ClearAllPoints()
+            x:SetPoint("CENTER", line, "LEFT", -10, 0)
+        end
+        if on and ns.ChallengesWindow then
+            self:SetItems({ { "PADBACK", "Challenges" } })
+            self:ClearAllPoints()
+            self:SetPoint("LEFT", win, "TOPLEFT", P(575, 945))
+            self:Show()
+        else
+            self:Hide()
+        end
+    end
     win:HookScript("OnHide", function() bar:Hide() end)
     bar:Hide()
     win.padBar = bar
@@ -1066,7 +1125,7 @@ local function PaintBox()
             b.right:SetAlpha(it.faded and 0.55 or 1)
             b.text:SetAlpha(it.faded and 0.55 or 1)
             b.sel:SetShown(box.selected ~= nil and it.key == box.selected)
-            b.cur:SetShown(focus == "right" and i + box.offset == box.cursor)
+            b.cur:SetShown((focus == "right" or box.walk) and i + box.offset == box.cursor)
             b:SetScript("OnClick", box.onPick and function() Tick(); box.onPick(it.key, it) end or nil)
         end
     end
@@ -1091,7 +1150,7 @@ local function Box(label, items, selected, onPick, who)
     local same = who ~= nil and who == box.who
     box.items, box.selected, box.onPick, box.who = items or {}, selected, onPick, who
     if not same then
-        box.offset, box.cursor = 0, 1
+        box.offset, box.cursor, box.walk = 0, 1, false
         for i, it in ipairs(box.items) do if selected ~= nil and it.key == selected then box.cursor = i end end
         if focus == "right" and not BoxUsable() then focus = "left" end
         -- start with the picked line in view
@@ -1304,13 +1363,25 @@ local function BitesIn(zone, spot)
     for _, id in ipairs(unknown) do list[#list + 1] = { key = id, text = "???", faded = true, mystery = true } end
     return list
 end
--- clicking a fish in that list opens it on Catches (a "???" stays a mystery)
+-- clicking a fish in that list opens it on Catches (a "???" stays a mystery);
+-- a treasure or a bit of junk opens on Whosits & Whatsits instead
 local function BitePick(zone, spotKey)
     return function(id, it)
         focus = "left"
-        mode, sel.catches, sel.spot = "catches", id, nil
-        sel.catchesZone, sel.catchesUnknown = zone, it and it.mystery or false
-        if not (it and it.mystery) and spotKey and DB().items[id] and DB().items[id].spots[spotKey] then sel.spot = spotKey end
+        local e = DB().items[id]
+        local fish = (it and it.mystery) or Journal.Kind(e, id) == "fish"
+        mode, sel.spot = fish and "catches" or "finds", nil
+        sel[mode] = id
+        if fish then
+            sel.catchesZone, sel.catchesUnknown = zone, it and it.mystery or false
+        else
+            sel.findsZone, sel.findsUnknown = nil, false
+            -- make sure the Show filter isn't hiding it
+            local kind = Journal.Kind(e, id)
+            local show = ns.db.journalFindsShow or "all"
+            if show ~= "all" and show ~= kind then ns.db.journalFindsShow = "all" end
+        end
+        if not (it and it.mystery) and spotKey and e and e.spots[spotKey] then sel.spot = spotKey end
         Journal.jump = id
         Journal:Refresh()
     end
@@ -1811,15 +1882,15 @@ function Journal:Refresh()
     Journal.pendingNav = nil
     if want and #win.nav > 0 then (want == "first" and win.nav[1] or win.nav[#win.nav]).go() end
     -- only with Forever's Gamepad UI turned on
-    if ns.OneKey and ns.OneKey.GamepadUIOn() then win.padBar:Show() else win.padBar:Hide() end
-    if win.padBar:IsShown() then win.padBar:Paint() end
+    win.padBar:Paint() -- the badges and the little bar, with the Gamepad UI on
 end
 
 -------------------------------------------------------------------------------
 -- Controller: the D-pad moves through the left page (turning pages at the
--- edges), the shoulders flip bookmarks, A shows the next spot, X sorts, Y
--- filters, View hops between the left and right pages, B closes. Triggers are left alone, so
--- one-button fishing keeps working with the book open.
+-- edges), the shoulders flip bookmarks, A shows the next spot (on Waters, walks
+-- "What bites here", and X opens the one it's on), X sorts, the right stick
+-- filters, Y writes a note, View opens Ducky's Challenges, B closes. Triggers
+-- are left alone, so one-button fishing keeps working with the book open.
 -------------------------------------------------------------------------------
 local function Turn(step, pick)
     local page = (win.navPage or 1) + step
@@ -1863,6 +1934,31 @@ local function Move(dir)
         if to then Tick(); to.go() else Turn(up and -1 or 1, up and "last" or "first") end
     end
 end
+-- Waters: A walks down "What bites here" (round again at the end), X opens the one it's on
+local function BoxStep()
+    if not BoxUsable() then return end
+    local n = #box.items
+    if box.walk then box.cursor = box.cursor % n + 1 else box.walk = true; box.cursor = math.max(1, math.min(n, box.cursor)) end
+    if box.cursor <= box.offset then box.offset = box.cursor - 1 end
+    if box.cursor > box.offset + #boxLines then box.offset = box.cursor - #boxLines end
+    Tick()
+    PaintBox()
+    BoxTip(boxLines[box.cursor - box.offset])
+    win.padBar:Paint()
+end
+local function BoxOpen()
+    if not (box.walk and BoxUsable()) then return end
+    local it = box.items[box.cursor]
+    if it then Tick(); box.onPick(it.key, it) end
+end
+-- Y: write a note on the one you're looking at (Y or B again when you're done)
+local function Note()
+    local eb = win.notes
+    if not (eb and eb.target) then return end
+    if eb:HasFocus() then eb:ClearFocus() else eb:SetFocus(); eb:SetCursorPosition(#eb:GetText()) end
+    Tick()
+    win.padBar:Paint()
+end
 local function NextSpot()
     local keys = win.spotKeys
     if not keys or #keys < 2 then return end
@@ -1871,34 +1967,7 @@ local function NextSpot()
     sel.spot = keys[at % #keys + 1]
     Journal:Refresh()
 end
--- on the right page the D-pad walks the little list there instead
-local Swap
-local function RightMove(dir)
-    if dir == "left" then return Swap() end
-    if dir ~= "up" and dir ~= "down" then return end
-    local n = #(box.items or {})
-    if n == 0 then return end
-    local was = box.cursor
-    box.cursor = math.max(1, math.min(n, box.cursor + (dir == "up" and -1 or 1)))
-    if box.cursor ~= was then Tick() end
-    if box.cursor <= box.offset then box.offset = box.cursor - 1 end
-    if box.cursor > box.offset + #boxLines then box.offset = box.cursor - #boxLines end
-    PaintBox()
-    BoxTip(boxLines[box.cursor - box.offset])
-end
-Swap = function()
-    if focus == "left" and not BoxUsable() then return end
-    focus = focus == "left" and "right" or "left"
-    Tick()
-    if focus == "right" then
-        -- start on the line in view
-        box.cursor = math.max(box.offset + 1, math.min(box.cursor, box.offset + #boxLines, #box.items))
-    end
-    PaintBox()
-    if focus == "right" then BoxTip(boxLines[box.cursor - box.offset]) else GameTooltip:Hide() end
-    if win.padBar:IsShown() then win.padBar:Paint() end
-end
-local function D(dir) return function() if focus == "right" then RightMove(dir) else Move(dir) end end end
+local function D(dir) return function() Move(dir) end end
 local PAD = {
     PADDUP = D("up"), PADDDOWN = D("down"), PADDLEFT = D("left"), PADDRIGHT = D("right"),
     PADLSHOULDER = function() win.flip(-1) end, PADRSHOULDER = function() win.flip(1) end,
@@ -1907,16 +1976,22 @@ local PAD = {
         if focus == "right" then
             local it = box.items and box.items[box.cursor]
             if it and box.onPick then box.onPick(it.key, it) end
-        elseif mode == "catches" or mode == "finds" then NextSpot() end
+        elseif mode == "catches" or mode == "finds" then NextSpot()
+        elseif mode == "waters" then BoxStep() end
     end,
     PAD2 = function() win:Hide() end,
-    PAD3 = function() if (mode == "catches" or mode == "finds") and focus == "left" then pcall(win.sortBtn.Click, win.sortBtn) end end,
+    PAD3 = function()
+        if (mode == "catches" or mode == "finds") and focus == "left" then pcall(win.sortBtn.Click, win.sortBtn)
+        elseif mode == "waters" then BoxOpen() end
+    end,
     PADRSTICK = function() if mode == "finds" and focus == "left" then pcall(win.showBtn.Click, win.showBtn) end end,
-    -- Y, from anywhere in the journal: Ducky's Challenges
-    PAD4 = function() if ns.ChallengesWindow then Tick(); ns.ChallengesWindow:Toggle() end end,
-    PADBACK = Swap,
+    PAD4 = Note,
+    -- View, from anywhere in the journal: Ducky's Challenges
+    PADBACK = function() if ns.ChallengesWindow then Tick(); ns.ChallengesWindow:Toggle() end end,
 }
 Journal.PAD = PAD
+function Journal.Mode() return mode end -- for tests
+function Journal.Box() return box end
 
 -------------------------------------------------------------------------------
 -- Showing it
@@ -1963,9 +2038,9 @@ local button = ns.Launcher{ name = "RubberDuckyJournalButton", art = Art("button
 function Journal:ApplyButton() button:Apply() end
 function Journal:ResetButton() button:Reset() end
 
--- the "Ducky Journal" macro
+-- the "Journal" macro
 Journal.MACRO_ICON = "Interface\\Icons\\INV_Misc_Book_11"
-function Journal:PickupMacro() ns.PickupMacro("Ducky Journal", Journal.MACRO_ICON, "/ducky journal", "journal") end
+function Journal:PickupMacro() ns.PickupMacro("Journal", Journal.MACRO_ICON, "/ducky journal", "journal") end
 
 function Journal:ResetPosition()
     ns.db.journalPos = nil

@@ -1,19 +1,40 @@
 -- Rubber Ducky: our own settings window. The same pages as the entry in the
 -- game's Settings (AddOns), in a frame of our own, so we can open straight to a
 -- page: Forever's Settings window ignores which page an addon asks for.
--- A page lives in one window at a time; opening one closes the other.
+-- Ours puts them under six tabs along the top; a tab with more than one page
+-- shows them one under another. A page lives in one window at a time; opening
+-- one closes the other.
 
 local ADDON, ns = ...
 local SW = {}
 ns.SettingsWindow = SW
 
-local W, H = 909, 600                 -- the window, in UI px at scale 1
-local NAV_W = 204
+local W, H = 909, 640                 -- the window, in UI px at scale 1
 local SCALE = 0.9
 local TEXT_SCALE = 1.12 -- the pages and the list, a touch bigger than the game's settings
 SW.TEXT_SCALE = TEXT_SCALE
 
-local win, content, navButtons, current = nil, nil, {}, nil
+local win, content, tabRow, current, currentTab = nil, nil, nil, nil, nil
+local stack, stackScroll -- a tab with more than one page: the pages one under another, scrolling together
+
+-- the tabs along the top, and the pages each one holds. Developer isn't a tab:
+-- it opens from a link at the bottom of Overview.
+local TABS = {
+    { "overview", "Overview", { "overview" } },
+    { "casting", "Casting", { "poleswap", "onebutton", "bobber", "tackle" } },
+    { "soundcam", "Sound & Camera", { "sound", "camera" } },
+    { "catch", "Your Catch", { "catch" } },
+    { "records", "Journal & Log", { "journal", "log" } },
+    { "social", "Social", { "flair" } },
+}
+SW.TABS = TABS
+local function TabOf(key)
+    for _, t in ipairs(TABS) do
+        for _, k in ipairs(t[3]) do if k == key then return t end end
+    end
+    return TABS[1] -- developer: Overview's tab stays lit
+end
+local function TabByKey(key) for _, t in ipairs(TABS) do if t[1] == key then return t end end end
 
 local function Sound(what) ns.UI.Sound(what) end
 
@@ -26,7 +47,8 @@ end
 -- The navy frame, its sign (or a title plaque) standing on the top edge, and
 -- the close button: shared by every window of ours.
 --   opts: width, height, sign ("settings", "welcome", "challenges") or title,
---         frame (the frame art's scale, smaller for small windows), scale, strata
+--         frame (the frame art's scale, smaller for small windows), scale, strata,
+--         signWidth (to keep the sign its usual size on a wider window)
 -- Returns the window and the layer above its page. win.inner is the opening:
 -- { left, top, right, bottom } in from the window's edges.
 function SW.Chrome(name, _, opts)
@@ -52,10 +74,11 @@ function SW.Chrome(name, _, opts)
     local top = CreateFrame("Frame", nil, win)
     top:SetAllPoints()
     top:SetFrameLevel((win:GetFrameLevel() or 1) + 20)
+    win.decor = UI.Stretch(top, "frame_top", "BACKGROUND", fs) -- the frame's trim, in front of the page
     if opts.sign then
         local S = UI.ART["sign_" .. opts.sign]
         -- narrow enough to stand clear of the corners, so the corner wood shows
-        local sw = math.floor(w * 0.74)
+        local sw = opts.signWidth or math.floor(w * 0.74)
         local sh = sw * S.ah / S.aw
         local sign = top:CreateTexture(nil, "ARTWORK")
         sign:SetTexture(ns.MEDIA .. "UI\\sign_" .. opts.sign)
@@ -100,56 +123,82 @@ function SW.SetTitle(w, text)
 end
 
 local function Build()
-    win = SW.Chrome("RubberDuckySettings", nil, { sign = "settings" })
+    win = SW.Chrome("RubberDuckySettings", nil, { sign = "settings", height = H })
     local L, T, R, B = unpack(win.inner)
     local UI = ns.UI
+    local k = TEXT_SCALE
+
+    -- the tabs along the top; LB and RB badges sit at either end
+    local items = {}
+    for i, t in ipairs(TABS) do items[i] = { t[1], t[2] } end
+    tabRow = UI.TabRow(win, items, function(key)
+        if key ~= currentTab or current == "developer" then Sound("page") end
+        SW:ShowTab(key)
+    end, { inset = 30 })
+    tabRow:Place(L, T + 2, (win:GetWidth() or W) - L - R)
+    local top = T + 2 + UI.TAB_ROW_H + 8
 
     -- where the pages go
     content = CreateFrame("Frame", nil, win)
-    content:SetPoint("TOPLEFT", (L + NAV_W + 16) / TEXT_SCALE, -T / TEXT_SCALE)
-    content:SetPoint("BOTTOMRIGHT", -R / TEXT_SCALE, B / TEXT_SCALE)
+    content:SetPoint("TOPLEFT", L / k, -top / k)
+    content:SetPoint("BOTTOMRIGHT", -R / k, B / k)
     content:SetFrameLevel((win:GetFrameLevel() or 1) + 5)
-    content:SetScale(TEXT_SCALE) -- the page inherits it; the game's Settings window doesn't
+    content:SetScale(k) -- the page inherits it; the game's Settings window doesn't
 
-    -- the page list: navy plates, parchment for the page you're on
-    for i, item in ipairs(ns.Options.ORDER or {}) do
-        local b = CreateFrame("Button", nil, win)
-        b:SetScale(TEXT_SCALE)
-        b:SetSize(NAV_W / TEXT_SCALE, 30)
-        b:SetPoint("TOPLEFT", win, "TOPLEFT", L / TEXT_SCALE, -(T + 4 + (i - 1) * 36) / TEXT_SCALE)
-        b:SetFrameLevel((win:GetFrameLevel() or 1) + 5)
-        b.art = UI.Stretch(b, "strip_navy", "BACKGROUND")
-        local hl = b:CreateTexture(nil, "HIGHLIGHT")
-        hl:SetPoint("TOPLEFT", 12, -5); hl:SetPoint("BOTTOMRIGHT", -12, 5); hl:SetColorTexture(1, 1, 1, 0.08)
-        local fs = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        fs:SetPoint("LEFT", 20, 0)
-        fs:SetPoint("RIGHT", -16, 0); fs:SetJustifyH("LEFT"); fs:SetWordWrap(false)
-        fs:SetText(item[2])
-        b.text, b.key = fs, item[1]
-        b:SetScript("OnClick", function() if current ~= item[1] then Sound("page") end; SW:ShowPage(item[1]) end)
-        navButtons[#navButtons + 1] = b
+    -- more than one page on a tab: they stack, and scroll as one
+    stackScroll = CreateFrame("ScrollFrame", "RubberDuckySettingsStack", content, "UIPanelScrollFrameTemplate")
+    stackScroll:SetPoint("TOPLEFT", 0, 0)
+    stackScroll:SetPoint("BOTTOMRIGHT", -UI.SCROLL_ROOM, 0)
+    stack = CreateFrame("Frame", nil, stackScroll)
+    stack:SetSize(600, 10)
+    stackScroll:SetScrollChild(stack)
+    stackScroll:SetScript("OnSizeChanged", function(_, w) if w and w > 0 then stack:SetWidth(w); SW:Restack() end end)
+    stackScroll:EnableMouseWheel(true)
+    function SW.Wheel(delta)
+        local v = (stackScroll:GetVerticalScroll() or 0) - delta * 60
+        stackScroll:SetVerticalScroll(math.max(0, math.min(v, stackScroll:GetVerticalScrollRange() or 0)))
     end
+    stackScroll:SetScript("OnMouseWheel", function(_, d) SW.Wheel(d) end)
+    UI.SlimScrollBar(stackScroll, content)
+    stackScroll:Hide()
 
     win:SetScript("OnShow", function() Place(); Sound("settingsOpen") end)
     win:SetScript("OnHide", function()
         Sound("settingsClose")
-        -- unless the game's Settings window took it back for itself
-        local page = current and ns.Options.pages[current]
-        if page and not (SettingsPanel and SettingsPanel:IsShown()) then page.frame:Hide() end
+        -- unless the game's Settings window took them back for itself
+        if not (SettingsPanel and SettingsPanel:IsShown()) then
+            for _, key in ipairs(SW.Shown()) do
+                local page = ns.Options.pages[key]
+                if page then page.frame:Hide() end
+            end
+        end
     end)
 
-    -- a controller: the D-pad moves through the page, the shoulders turn pages
+    -- a controller: the D-pad moves through the page, the shoulders change tab,
+    -- B closes (or, on the developer page, goes back to Overview)
     SW.pad = ns.Pad.Attach(win, {
-        roots = function() local p = current and ns.Options.pages[current]; return { p and p.frame } end,
-        pages = function(dir)
-            local order = ns.Options.ORDER or {}
-            for i, item in ipairs(order) do
-                if item[1] == current then
-                    Sound("page")
-                    SW:ShowPage(order[(i - 1 + dir) % #order + 1][1])
-                    return
-                end
+        roots = function()
+            local list = {}
+            for _, key in ipairs(SW.Shown()) do
+                local p = ns.Options.pages[key]
+                if p then list[#list + 1] = p.frame end
             end
+            return list
+        end,
+        pages = function(dir)
+            local at = 1
+            for i, t in ipairs(TABS) do if t[1] == currentTab then at = i end end
+            Sound("page")
+            SW:ShowTab(TABS[(at - 1 + dir) % #TABS + 1][1])
+        end,
+        close = function()
+            if current == "developer" then Sound("page"); SW:ShowTab("overview") else win:Hide() end
+        end,
+        badges = function(nav)
+            local b = tabRow.buttons
+            nav:Badge(b[1], "PADLSHOULDER", "LEFT", -18, -4, 28)
+            nav:Badge(b[#b], "PADRSHOULDER", "RIGHT", 18, -4, 28)
+            nav:Badge(win.close, "PAD2", "TOPLEFT", 2, -2, 22)
         end,
     })
 
@@ -160,22 +209,101 @@ local function Build()
     Place()
 end
 
+-- the pages showing now: the tab's, or the developer page on its own
+local shown = {}
+function SW.Shown() return shown end
+
+-- stacked pages: each as tall as its heading and its cards, so only the stack scrolls
+local HEAD = 72 + 8 + 6 + 4
+function SW:Restack()
+    if not (stack and #shown > 1) then return end
+    local y = 0
+    for _, key in ipairs(shown) do
+        local p = ns.Options.pages[key]
+        if p then
+            local h = HEAD + (p.content:GetHeight() or 200)
+            p.frame:ClearAllPoints()
+            p.frame:SetPoint("TOPLEFT", stack, "TOPLEFT", 0, -y)
+            p.frame:SetPoint("TOPRIGHT", stack, "TOPRIGHT", 0, -y)
+            p.frame:SetHeight(h)
+            y = y + h + 14
+        end
+    end
+    stack:SetHeight(math.max(1, y))
+end
+
+-- a stacked page's own scroll hands the mouse wheel to the stack
+local wheeled = {}
+local function Stackable(p)
+    if wheeled[p] then return end
+    wheeled[p] = true
+    local own = p.scroll:GetScript("OnMouseWheel")
+    p.scroll:SetScript("OnMouseWheel", function(self, d)
+        if p.frame:GetParent() == stack and SW.Wheel then SW.Wheel(d) elseif own then own(self, d) end
+    end)
+    p.content:HookScript("OnSizeChanged", function() if p.frame:GetParent() == stack then SW:Restack() end end)
+    -- stacked, a page's own scroll bar never shows, so its cards can run the full width
+    local function Room()
+        local stacked = p.frame:GetParent() == stack
+        p.scroll:SetPoint("BOTTOMRIGHT", stacked and -4 or -ns.UI.SCROLL_ROOM, 6)
+    end
+    p.frame:HookScript("OnShow", Room)
+    Room()
+end
+
+local function Show(keys, tab)
+    local pages = ns.Options.pages
+    for _, key in ipairs(shown) do
+        local p = pages[key]
+        if p then p.frame:Hide() end
+    end
+    shown = {}
+    for _, key in ipairs(keys) do if pages[key] then shown[#shown + 1] = key end end
+    currentTab = tab
+    tabRow:Select(tab)
+    if #shown > 1 then
+        stackScroll:Show()
+        stackScroll:SetVerticalScroll(0)
+        for _, key in ipairs(shown) do
+            local p = pages[key]
+            Stackable(p)
+            p.frame:SetParent(stack)
+            p.frame:Hide(); p.frame:Show() -- shown fresh, so it refreshes
+        end
+        SW:Restack()
+    else
+        stackScroll:Hide()
+        local p = pages[shown[1]]
+        p.frame:SetParent(content)
+        p.frame:ClearAllPoints()
+        p.frame:SetAllPoints(content)
+        p.frame:Hide(); p.frame:Show()
+    end
+    if SW.pad then SW.pad:Clear(); SW.pad:Paint() end
+end
+
+function SW:ShowTab(key)
+    local t = TabByKey(key) or TABS[1]
+    current = t[3][1]
+    Show(t[3], t[1])
+end
+
+-- a page: its tab, scrolled to it
 function SW:ShowPage(key)
     local pages = ns.Options.pages
-    local page = pages[key] or pages.overview
-    if not page then return end
-    key = pages[key] and key or "overview"
-    local prev = current and pages[current]
-    if prev and current ~= key then prev.frame:Hide() end
+    if not pages[key] then key = "overview" end
+    if key == "developer" then
+        current = key
+        Show({ key }, "overview")
+        return
+    end
+    local t = TabOf(key)
     current = key
-    page.frame:SetParent(content)
-    page.frame:ClearAllPoints()
-    page.frame:SetAllPoints(content)
-    page.frame:Hide(); page.frame:Show() -- shown fresh, so it refreshes
-    for _, b in ipairs(navButtons) do
-        local on = b.key == key
-        b.art:SetArt(on and "strip_parch" or "strip_navy")
-        b.text:SetFontObject(on and ns.UI.FONT.bold or "GameFontHighlight")
+    Show(t[3], t[1])
+    if #shown > 1 then
+        local p = pages[key]
+        local _, _, _, _, y = p.frame:GetPoint(1)
+        if y then stackScroll:SetVerticalScroll(math.max(0, math.min(-y, stackScroll:GetVerticalScrollRange() or 0))) end
     end
 end
 
@@ -197,3 +325,5 @@ end
 function SW:IsShown() return win ~= nil and win:IsShown() end
 function SW:Hide() if win then win:Hide() end end
 function SW:Current() return current end
+function SW:CurrentTab() return currentTab end
+

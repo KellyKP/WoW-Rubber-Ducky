@@ -143,7 +143,8 @@ local function Build()
     fish:SetPoint("BOTTOMLEFT", inner, "BOTTOM", 8, 4)
     Welcome.panels = panels
     Welcome.area = { iw, ih - top - bottom }
-    Welcome.pad = ns.Pad.Attach(dialog, { roots = function() return { inner } end, close = Close })
+    Welcome.pad = ns.Pad.Attach(dialog, { roots = function() return { inner } end, close = Close,
+        badges = function(nav) nav:Badge(dialog.close, "PAD2", "TOPLEFT", 2, -2, 22) end })
 end
 
 function Welcome:Show()

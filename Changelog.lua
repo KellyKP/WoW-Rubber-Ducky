@@ -5,6 +5,31 @@ local Changelog = {}
 ns.Changelog = Changelog
 
 Changelog.entries = {
+    { "0.25.0", {
+        "|cffffd100New|r",
+        "Track a challenge: click one in Ducky's Challenges and a progress bar fills along the wooden plank at the bottom of your fishing log. Click it again to stop. The one you're tracking wears a little compass. With nothing tracked, the plank shows your fishing skill instead (and the boost from your lure in green). Your quarterboard on the log is clickable too: it takes you straight to Mrrl's shelf of boards.",
+        "Nine new catch splashes: Caught It!, Nice Catch!, Reel Success!, That's a Keeper!, Line's Tight!, Bigger Catch!, Another One!, Lucky Duck! and Quack! And when a catch has treasure in it, it's Treasure! Got One! and Hooked! have a fresh coat of paint too. Misses get a fresh bunch too: Missed!, Oof!, So Close!, Almost!, Not This Time!, Bummer! and Empty!, and No Bite! when the cast runs out.",
+        "The hello in chat when you log in has a [Settings] link to click, and the first login after an update has [See what's new].",
+        "The tackle wheel: a ship's wheel in two pages. Fishing has the lures in your bags (best first, with how many you have and their fishing bonus; ones above your skill are greyed out), plus Mrrl's shop, Professions, Ducky's Challenges and your fishing journal. Pick a lure and it goes straight on your pole (hold your pole first). Camp has your campfire kits, best first, then any camp features you carry, from every profession (a Fishing Rack, a Camp Tent, a Mana Well...), and the fish foods that boost fishing. Turn the page with LB and RB, the mouse wheel, or the arrows on the parchment. Open it from the tackle box by the duck on your fishing log, with /ducky tackle, or from a macro with /click RubberDuckyTackleButton. It pops open and tucks away with the sound of a tackle box. Out of combat for now. On a controller, the right stick points, A picks, LB and RB turn the page, and B closes. Its settings are under Casting, with a macro to drag onto your bars, and the tackle box on the log can be turned off there.",
+        "The journal's Waters page shows the fishing skill each zone needs, using Forever's own numbers: red if you can't fish there yet, orange if some will still get away.",
+        "A banner under the fishing log when you can learn the next fishing rank, one for each: Apprentice (if you haven't learned fishing yet), Journeyman, Expert and Artisan, once your skill has reached its cap and catches stop counting. Hover it for where to go, including Nat Pagle's four fish for Artisan, ticked off as you catch them, and where to fish next. Right-click hides it until next time; turn it off on the Fishing log settings.",
+        "|cffffd100Changed|r",
+        "The journal's Catches page now has every fish in Forever, 51 in all: the nine Bloated fish, Steelscale Crushfish, Spotted Sunfish, Oil Covered Fish, Zulian Mudskunk and Rockhide Strongfish join the rest, each with its own lines from Ducky. The Big-mouth Clam moves to Whosits & Whatsits, since you open it for a pearl. Anything you've already caught moves along with them, and Know Your Fish III now asks for all 51.",
+        "Rubber Ducky's macros have shorter names that fit under a button: Pole, Log, Journal, and Lures for the tackle wheel. The ones already on your bars are renamed where they sit, so nothing moves.",
+        "Ducky's Challenges shows what each challenge pays in a tile beside it: the quarterboard, bobber, charm or motto it finds you, and its Fishbones. The window's a little wider to fit them.",
+        "Pick which challenges to see: All, Close (the ones you're nearest to finishing, closest first), Done (newest first) or To do. It remembers your choice, and X switches it on a controller.",
+        "When you finish a challenge, its banner says so, and what it pays pops in underneath, one line at a time, like loot under a catch.",
+        "Fish On! has retired from the catch splashes. If you'd picked one splash to always show, pick it again.",
+        "Mrrl's Doohickey Emporium on a controller: the D-pad browses the shelf and turns the page at its edge, X buys or wears what you're looking at, the shoulder buttons change tab and B closes. And Buy is one press now, no \"are you sure?\" The one you're looking at sparkles all the way round, so it's easy to spot. And when you buy something, the whole counter sparkles for a moment.",
+        "No more controls bar under the windows: with the Gamepad UI on, each controller button's picture sits right on what it does. LB and RB by the tabs or bookmarks, X on Buy or Sort, A on the journal's map, B on the close button. The journal keeps a little bar beside its bookmarks for the one that doesn't sit on anything, View.",
+        "The journal on a controller: no more hopping between the left and right pages. On Waters, A walks down \"What bites here\" and X opens the one it's on. Y writes a note (Y or B when you're done), and View opens Ducky's Challenges.",
+        "Ducky's Challenges has its groups as a row of tabs along the top, so LB and RB go left and right like they look. The list gets the full width, and each group's count sits beside its name.",
+        "Settings has its pages under six tabs along the top, like Ducky's Challenges: Overview, Casting, Sound & Camera, Your Catch, Journal & Log and Social. A tab with more than one page shows them one under another. Developer settings open from a button at the bottom of Overview.",
+        "New scroll bars to match the rest: a blue glass track in gold, a rope-bound thumb you can drag, and an arrow at each end.",
+        "|cffffd100Fixed|r",
+        "On Waters, picking a treasure or a bit of junk in \"What bites here\" opens it on Whosits & Whatsits, not Catches.",
+        "On a controller, What's new, Copy my settings and the Interact-key help now close with B, and What's new and Copy my settings scroll with the D-pad. What's new's words no longer run under its scroll bar, and Copy my settings has the new scroll bar to match the rest.",
+    } },
     { "0.24.0", {
         "|cffffd100New|r",
         "Fishing journal: a leather-bound book of everything you've ever caught, one for each character. Open it from Rubber Ducky's line in the minimap's AddOns list, an optional journal button you can drag anywhere, or a \"Ducky Journal\" macro for your action bars. /ducky journal does the same.",
@@ -86,17 +111,24 @@ local function Build()
 
     local scroll = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", L + 4, -T)
-    scroll:SetPoint("BOTTOMRIGHT", -(R + 14), B)
+    scroll:SetPoint("BOTTOMRIGHT", -(R + ns.UI.SCROLL_ROOM), B)
     local body = CreateFrame("Frame", nil, scroll)
-    body:SetSize(560 - L - R - 24, 10)
+    body:SetSize(560 - L - R - 4 - ns.UI.SCROLL_ROOM, 10)
     scroll:SetScrollChild(body)
     ns.UI.SlimScrollBar(scroll, win)
     local text = body:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     text:SetPoint("TOPLEFT")
-    text:SetWidth(560 - L - R - 24)
+    -- inside the scrolling box, clear of the scroll bar beside it
+    text:SetWidth(560 - L - R - 4 - ns.UI.SCROLL_ROOM - 8)
     text:SetJustifyH("LEFT")
     text:SetSpacing(3)
     win.text, win.body = text, body
+
+    -- on a controller: nothing to pick, so the D-pad scrolls, and B closes
+    if ns.Pad and ns.Pad.Attach then
+        Changelog.pad = ns.Pad.Attach(win, { roots = function() return {} end, scroll = function() return scroll end,
+            badges = function(nav) if win.close then nav:Badge(win.close, "PAD2", "TOPLEFT", 2, -2, 22) end end })
+    end
 end
 
 function Changelog:Show()

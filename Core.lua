@@ -39,7 +39,7 @@ ns.defaults = {
 
     -- Catch splash
     splashEnabled    = true,
-    splashBanner     = 0,     -- 0 = random, else index into Splash.BANNERS
+    splashBannerKey  = "",    -- "" = a different one each catch, else a key from Splash.BANNERS
     splashSize       = 0.7,
     splashDuration   = 3,
     splashY          = 200,
@@ -52,6 +52,8 @@ ns.defaults = {
     logAutoOpen = true,   -- opens when a fishing pole goes on (it always closes when the pole comes off)
     logScale    = 1,
     logButton   = false,  -- a little button that opens and closes the log
+    rankAlert   = true,   -- a banner under the log when you can learn the next fishing rank
+    tackleOnLog = true,   -- the tackle box by the duck on the log (opens the tackle wheel)
     logButtonLocked = false, -- right-click the button to lock it in place
     logButtonSize   = 40,    -- about an action button
     journalEnabled  = true,
@@ -68,6 +70,7 @@ ns.defaults = {
     journalSort     = "zone",
     journalFindsSort = "type",
     journalFindsShow = "all",
+    challengesShow = "all",   -- Ducky's Challenges: all, close, done or todo
     journalButton   = false,  -- an on-screen journal button, like the log's
     journalButtonLocked = false,
     journalButtonSize   = 40,
@@ -106,6 +109,30 @@ ns.DUCK = ns.BobberArt("duck")
 -- The few messages meant for chat: duck icon + name in front.
 local CHAT_PREFIX = "|T" .. ns.DUCK .. ":14:14|t |cffffd100Rubber Ducky:|r "
 function ns.Chat(msg) print(CHAT_PREFIX .. msg) end
+
+-- Links in our chat lines: click one to open that part of Rubber Ducky
+-- ("rubberducky:bones" opens Mrrl's, "rubberducky:settings" the settings...).
+-- The game hands links it doesn't know to whoever registered for them; without
+-- that (an older client) they're plain text, as clicking an unknown link would
+-- be an error.
+ns.LINK_OPEN = {}
+if LinkUtil and LinkUtil.RegisterLinkHandler then
+    ns.linkable = pcall(LinkUtil.RegisterLinkHandler, "rubberducky", function(link, _, linkData)
+        local what = type(link) == "string" and link:match("rubberducky:(%w+)")
+            or (type(linkData) == "table" and linkData.options) or "bones"
+        local open = ns.LINK_OPEN[what]
+        if open then ns.Safe(open) end
+        return LinkProcessorResponse and LinkProcessorResponse.Handled
+    end)
+end
+-- a clickable [label] in chat (or just the label, where links don't work)
+function ns.Link(what, label, color)
+    color = color or "ffd100"
+    if not ns.linkable then return "|cff" .. color .. label .. "|r" end
+    return "|cff" .. color .. "|Hrubberducky:" .. what .. "|h[" .. label .. "]|h|r"
+end
+ns.LINK_OPEN.settings = function() if ns.Options then ns.Options:Open() end end
+ns.LINK_OPEN.whatsnew = function() if ns.Changelog then ns.Changelog:Show() end end
 
 -- Status messages go to the debug console, never to chat.
 ns.consoleLines = {}
@@ -161,6 +188,28 @@ function ns.Safe(fn, ...)
     local ok, a, b, c, d = pcall(fn, ...)
     if ok then return a, b, c, d end
     return nil
+end
+
+-- Our macros' names, short so they fit under a button. Ones made before they
+-- were shortened ("Ducky Log" and so on) are renamed when they're next looked
+-- up, so they stay on your bars.
+ns.OLD_MACRO = { Pole = { "Ducky Pole" }, Log = { "Ducky Log" }, Journal = { "Ducky Journal" },
+    Lures = { "Ducky Tackle", "Lure" } }
+function ns.MacroIndex(name)
+    local i = ns.Safe(GetMacroIndexByName, name)
+    if i and i > 0 then return i end
+    local j
+    for _, old in ipairs(ns.OLD_MACRO[name] or {}) do
+        local x = ns.Safe(GetMacroIndexByName, old)
+        if x and x > 0 then j = x; break end
+    end
+    if not j then return nil end
+    -- not mid-fight, nor under the Macros window (an edit there can be lost)
+    if InCombatLockdown() or (MacroFrame and MacroFrame:IsShown()) then return j end
+    local _, icon, body = ns.Safe(GetMacroInfo, j)
+    ns.Safe(EditMacro, j, name, icon, body)
+    local k = ns.Safe(GetMacroIndexByName, name) -- renaming can re-sort the list
+    return (k and k > 0) and k or j
 end
 
 function ns.IsSecret(v)
@@ -437,8 +486,15 @@ EVENTS:SetScript("OnEvent", function(_, event, ...)
         local updated = v and not firstTime and ns.db.lastVersion ~= v
         if v then ns.db.lastVersion = v end
         if ns.db.welcome and not firstTime then
+            -- with a link to click, where the game allows them
             if updated then
-                ns.Chat(string.format("Quack! Updated to v%s. See what's new: type |cffffd100/ducky|r, then press What's new.", v))
+                if ns.linkable then
+                    ns.Chat(string.format("Quack! Updated to v%s. %s", v, ns.Link("whatsnew", "See what's new")))
+                else
+                    ns.Chat(string.format("Quack! Updated to v%s. See what's new: type |cffffd100/ducky|r, then press What's new.", v))
+                end
+            elseif ns.linkable then
+                ns.Chat(string.format("Quack! %sis ready to fish. %s", v and ("v" .. v .. " ") or "", ns.Link("settings", "Settings")))
             else
                 ns.Chat(string.format("Quack! %sis ready to fish. Type |cffffd100/ducky|r for settings.",
                     v and ("v" .. v .. " ") or ""))
@@ -529,9 +585,10 @@ local function Help()
     print("  /ducky journal       open or close the fishing journal")
     print("  /ducky challenges    open or close Ducky's Challenges")
     print("  /ducky shop          visit Mrrl's Doohicky Emporium")
+    print("  /ducky tackle        the tackle wheel: your lures, camp gear and more")
     print("  /ducky welcome       show the welcome screen again")
     print("  /ducky restore       put your sound, camera and soft-target settings back now")
-    -- developer commands (debug, console, button, probe, events, mark, flairtest) aren't listed
+    -- developer commands (debug, console, button, probe, events, mark, flairtest, ranktest) aren't listed
 end
 
 local function Toggle(key, label)
@@ -556,6 +613,8 @@ SlashCmdList.RUBBERDUCKY = function(msg)
     elseif msg == "onekey" then
         Toggle("oneKeyEnabled", "One-button fishing")
         if ns.OneKey then ns.OneKey:Update() end
+    elseif msg == "tackle" or msg == "wheel" then
+        if ns.Tackle then ns.Tackle:Toggle() end
     elseif msg == "icons" then
         if ns.Picker then ns.Picker:Toggle() end
     elseif msg:match("^swap") then
@@ -582,6 +641,9 @@ SlashCmdList.RUBBERDUCKY = function(msg)
         if ns.Journal then ns.Journal:Toggle(true) end
     elseif msg == "challenges" then
         if ns.ChallengesWindow then ns.ChallengesWindow:Toggle() end
+    elseif msg:match("^ranktest") then
+        -- /ducky ranktest apprentice|journeyman|expert|artisan (or nothing, to stop)
+        if ns.Rank then ns.Rank.Test(msg:match("^ranktest%s+(%a+)")) end
     elseif msg == "flairtest" then
         if ns.Social then ns.Social:Test() end
     elseif msg == "shop" or msg == "mrrl" then

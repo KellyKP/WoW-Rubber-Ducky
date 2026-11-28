@@ -185,6 +185,28 @@ function CH:State()
     return list, f
 end
 
+-- the one challenge you're keeping an eye on (its bar's on the fishing log)
+function CH.Tracked()
+    local id = ns.Journal and ns.Journal.DB and Saved().track
+    if not id then return nil end
+    for _, c in ipairs(CH:State()) do
+        if c.def.id == id then return c end
+    end
+end
+-- track one (nil: none); finished or still hidden ones can't be
+function CH.Track(id)
+    local saved = Saved()
+    if id then
+        for _, c in ipairs(CH:State()) do
+            if c.def.id == id and (c.done or c.def.hidden) then return false end
+        end
+    end
+    saved.track = id
+    if ns.Log and ns.Log.UpdateTrack then ns.Log.UpdateTrack() end
+    if ns.ChallengesWindow and ns.ChallengesWindow.Refresh then ns.ChallengesWindow:Refresh() end
+    return true
+end
+
 function CH:Count(group)
     local n, all = 0, 0
     local done = Saved().done
@@ -214,6 +236,7 @@ function CH:Check()
         end
     end
     saved.init = true
+    if ns.Log and ns.Log.UpdateTrack then ns.Log.UpdateTrack() end
     -- every finished challenge pays its Shiny Fishbones, once; the first time
     -- this runs that includes the ones done before Fishbones were a thing
     local F = ns.Flair
@@ -250,6 +273,7 @@ end
 -------------------------------------------------------------------------------
 
 local TW, RING = 420, 72              -- banner width, the medallion's ring
+local ROW_W, ROW_H = 340, 30          -- the rewards under the banner, like loot under a catch
 local queue, toast, playing = {}, nil, nil
 
 local function Ease(t) t = math.max(0, math.min(1, t)); return 1 - (1 - t) * (1 - t) end
@@ -284,11 +308,91 @@ local function Build()
     head:SetJustifyH("LEFT"); name:SetJustifyH("LEFT")
     name:SetWordWrap(false)
     toast.head, toast.name = head, name
+    toast.rows = {}
     toast:SetScript("OnClick", function()
         if toast.flair then
             if ns.Shop then ns.Shop:Show("motto") end
         elseif ns.ChallengesWindow then ns.ChallengesWindow:Show(toast.group) end
     end)
+end
+
+-- one reward line under the banner: the catch splash's rarity band, an icon
+-- (or a little quarterboard) and its words
+local function Row(i)
+    local r = toast.rows[i]
+    if r then return r end
+    local Splash = ns.Splash
+    r = CreateFrame("Frame", nil, toast)
+    r:SetSize(ROW_W, ROW_H)
+    local function Pair(layer, sub, edge)
+        local l = r:CreateTexture(nil, layer, nil, sub)
+        local rr = r:CreateTexture(nil, layer, nil, sub)
+        if edge then
+            l:SetPoint(edge .. "LEFT"); l:SetPoint(edge .. "RIGHT", r, edge)
+            rr:SetPoint(edge .. "RIGHT"); rr:SetPoint(edge .. "LEFT", r, edge)
+            l:SetHeight(1); rr:SetHeight(1)
+        else
+            l:SetPoint("TOPLEFT"); l:SetPoint("BOTTOMRIGHT", r, "BOTTOM")
+            rr:SetPoint("TOPRIGHT"); rr:SetPoint("BOTTOMLEFT", r, "BOTTOM")
+        end
+        return { l, rr }
+    end
+    r.base = Pair("BACKGROUND", 0)
+    r.wash = Pair("BACKGROUND", 1)
+    r.edges = { Pair("BORDER", 0, "TOP"), Pair("BORDER", 0, "BOTTOM") }
+    if Splash and Splash.Band then Splash.Band(r.base, 0, 0, 0, 0.6) end
+    r.icon = r:CreateTexture(nil, "ARTWORK")
+    r.text = r:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    r.text:SetShadowOffset(1, -1)
+    toast.rows[i] = r
+    return r
+end
+
+local MOTTO_ICON = "Interface\\Icons\\INV_Scroll_03"
+-- what a challenge pays, as lines: its Fishbones, then each bit of flair
+function CH.Rewards(def)
+    local F = ns.Flair
+    local out = {}
+    if not (F and def and def.id) then return out end
+    local pay = F.REWARD[def.id]
+    if pay then
+        out[#out + 1] = { icon = F.ICON_GAME, text = "+" .. (BreakUpLargeNumbers and BreakUpLargeNumbers(pay) or pay)
+            .. " Shiny Fishbones", color = { 1, 0.82, 0 }, bones = true }
+    end
+    for _, it in ipairs(F.Prizes(def.id) or {}) do
+        out[#out + 1] = { icon = it.kind == "motto" and MOTTO_ICON or it.art, board = it.kind == "board",
+            text = (it.kind == "motto" and ("\"" .. it.name .. "\"") or it.name) .. "  |cffffffffnew " .. F.SINGULAR[it.kind] .. "!|r",
+            color = { 0.64, 0.21, 0.93 } }
+    end
+    return out
+end
+
+local function FillRows(list)
+    local Splash = ns.Splash
+    for i, it in ipairs(list) do
+        local r = Row(i)
+        if it.board then
+            r.icon:SetSize((ROW_H - 2) * 2, ROW_H - 2); r.icon:SetTexCoord(0, 1, 0, 1)
+        elseif it.bones or it.icon == MOTTO_ICON then
+            r.icon:SetSize(ROW_H - 4, ROW_H - 4); r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        else
+            r.icon:SetSize(ROW_H, ROW_H); r.icon:SetTexCoord(0, 1, 0, 1)
+        end
+        r.icon:SetTexture(it.icon)
+        r.text:SetText(it.text)
+        if it.bones then r.text:SetTextColor(1, 0.86, 0.35) else r.text:SetTextColor(1, 1, 1) end
+        local c = it.color
+        if Splash and Splash.Band then
+            Splash.Band(r.wash, c[1], c[2], c[3], 0.45)
+            for _, e in ipairs(r.edges) do Splash.Band(e, c[1], c[2], c[3], 0.95) end
+        end
+        local w = math.min(r.text:GetStringWidth() or 0, ROW_W - 60) + (r.icon:GetWidth() or ROW_H) + 6
+        r.icon:ClearAllPoints(); r.icon:SetPoint("LEFT", r, "CENTER", -w / 2, 0)
+        r.text:ClearAllPoints(); r.text:SetPoint("LEFT", r.icon, "RIGHT", 6, 0)
+        r:SetAlpha(0)
+        r:Show()
+    end
+    for i = #list + 1, #toast.rows do toast.rows[i]:Hide() end
 end
 
 local DROP, LAND, OPEN, TEXT, FOLD, AWAY = 0.35, 0.15, 0.4, 0.2, 0.35, 0.3
@@ -341,6 +445,17 @@ local function Paint(t)
     toast.name:SetPoint("TOPLEFT", plate, "TOPLEFT", x0, -mid - 1)
     toast.name:SetWidth(math.max(20, x1 - x0))
     toast.head:SetAlpha(text); toast.name:SetAlpha(text)
+    -- the rewards pop in underneath once it's open, one after another, like loot
+    for i, r in ipairs(toast.rows) do
+        if r:IsShown() then
+            local k
+            if t < tFold then k = math.min(1, math.max(0, (t - tHold + 0.1 - i * 0.12) / 0.2))
+            else k = math.max(0, 1 - (t - tFold) / FOLD * 2) end
+            r:SetAlpha(Ease(k) * alpha)
+            r:ClearAllPoints()
+            r:SetPoint("TOP", toast, "BOTTOM", 0, -4 - (i - 1) * (ROW_H + 4) - (1 - Ease(k)) * 12)
+        end
+    end
     return t >= tAway + AWAY
 end
 
@@ -352,6 +467,7 @@ local function Next()
     toast.head:SetText(playing.header or "CHALLENGE COMPLETE")
     toast.name:SetText(playing.name)
     toast.group, toast.flair = playing.group, playing.flair
+    FillRows(playing.rewards or {})
     local start = GetTime()
     toast:SetScript("OnUpdate", function()
         if Paint(GetTime() - start) then Next() end
@@ -361,24 +477,17 @@ local function Next()
     ns.UI.Sound("challenge")
 end
 
--- the banner's top line: what you got besides the challenge itself
+-- the banner's top line (what it pays shows underneath, like loot)
 function CH.Header(def)
-    local F = ns.Flair
-    local r = F and F.REWARD[def.id]
-    local bones = r and ("+" .. F.Bones(r, 13)) or nil
-    local prizes = F and F.Prizes(def.id) or {}
-    local what = prizes[1] and ("NEW " .. F.SINGULAR[prizes[1].kind]:upper() .. "!")
-    if #prizes > 1 then what = "NEW FLAIR!" end
-    if what and bones then return bones .. "  ·  " .. what end
-    if what then return "CHALLENGE COMPLETE  ·  " .. what end
-    if bones then return "CHALLENGE COMPLETE  ·  " .. bones end
     return "CHALLENGE COMPLETE"
 end
 
 function CH:Toast(def)
     if not toast then Build() end
     local header = def.header or (not def.summary and CH.Header(def)) or nil
-    queue[#queue + 1] = { name = def.name, header = header, group = def.group, summary = def.summary, flair = def.flair }
+    local rewards = (not def.summary and not def.flair) and CH.Rewards(def) or nil
+    queue[#queue + 1] = { name = def.name, header = header, group = def.group, summary = def.summary, flair = def.flair,
+        rewards = rewards }
     if not playing then Next() end
 end
 CH.queue = queue

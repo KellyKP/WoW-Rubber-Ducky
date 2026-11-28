@@ -591,10 +591,24 @@ function Social:LogBoard()
     end
     if not Social.mine then
         Social.mine = Social.NewBoard(log)
+        -- click it to go and see Mrrl about a new look
+        local m = Social.mine
+        m:EnableMouse(true)
+        m:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText("Your quarterboard")
+            GameTooltip:AddLine("Fellow Ducky Anglers see this over your head while you fish.", 1, 1, 1, true)
+            GameTooltip:AddLine("Click to visit Mrrl's Doohicky Emporium.", 0.5, 0.8, 1)
+            GameTooltip:Show()
+        end)
+        m:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        m:SetScript("OnMouseUp", function(_, button)
+            if button == "LeftButton" and ns.Shop then GameTooltip:Hide(); ns.Shop:Show("board") end
+        end)
     end
     local b = Social.mine
     -- resting on the top plank, the bobber and charm dangling over it
-    b:Set(Social.Mine(), 260, Social.BoardName(Social.FullName("player")), 1, 60)
+    b:Set(Social.Mine(), 260, Social.BoardName(Social.FullName("player")), 1, 50) -- the bobber and charm a touch smaller than over heads
     b:ClearAllPoints()
     b:SetPoint("BOTTOM", log, "TOP", 15, -52 - (b.foot or 0))
     b:SetFrameLevel(log:GetFrameLevel() + 10) -- the bobber and charm in front of the title

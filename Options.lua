@@ -116,17 +116,22 @@ local function OverviewPage()
     Feature(c, "Interface\\Icons\\INV_Misc_Spyglass_03", "Camera", "Eases in toward the water while you fish, back out when you loot.", nil, "camera")
     Feature(c, ns.BobberArt("glowlantern"), "Bobber", "Sparkles and your choice of 30 bobber icons mark where it landed.", false, "bobber")
     Feature(c, "Interface\\Icons\\INV_Fishingpole_02", "One-button fishing", "One button casts and reels in.", nil, "onebutton")
+    Feature(c, ns.MEDIA .. "Tackle\\icon_wheel", "Tackle wheel", "Your lures, camp gear and favourite places, on one wheel.", false, "tackle")
     Feature(c, "Interface\\Icons\\INV_Misc_Fish_02", "Your catch", "Straight to your bags, with a splash to celebrate.", nil, "catch")
     Feature(c, ns.MEDIA .. "Log\\button", "Fishing log", "Everything you caught this session, written on a parchment board.", false, "log")
     Feature(c, ns.MEDIA .. "Journal\\button", "Fishing journal", "A book of every fish this character has caught, where, and the ones still to find.", false, "journal")
     c:Advance(4)
-    c:Text("Pick a section on the left to change its settings.", true)
+    c:Text("Pick a tab above to change its settings.", true)
     c:Buttons{ { "What's new", function() ns.Changelog:Show() end, width = 140 },
         { "Welcome screen", function() ns.Welcome:Show() end, width = 150 } }
 
     local hello = p:Card("Hello")
     hello:Toggle{ label = "Say hello in chat when you log in", key = "welcome",
         desc = "One line with the version, and what's new after an update." }
+    -- the developer page isn't a tab: it opens from here
+    local dev = p:Card("Developer")
+    dev:Text("Tools for testing and troubleshooting: the console, the event recorder and starting fresh.", true)
+    dev:Buttons{ { "Developer settings", function() UI.Sound("page"); Options:Open("developer") end, width = 190 } }
     p:OnRefresh(function(page)
         local style = ns.db.markerStyle or 1
         if style < 1 then style = math.random(#ns.Bobber.MARKERS) end
@@ -275,29 +280,43 @@ local function AddSplashCards(p)
     local pick = p:Card("Catch splash")
     pick:Toggle{ label = "Show a splash with your catch", key = "splashEnabled",
         desc = "A big BAM and what you caught, when your catch skips the loot window." }
-    local TW, TH, GAP, PER = 200, 100, 8, 2
+    -- tiles like the bobber picker's: navy, the chosen one parchment with a blue gem
+    local TW, TH, GAP, PER = 132, 72, 6, 3
     local rowsN = math.ceil(#list / PER)
     local y = pick:Advance(rowsN * (TH + GAP))
     local thumbs = {}
     for i, b in ipairs(list) do
-        local t = CreateFrame("Button", nil, pick.frame, "BackdropTemplate")
+        local t = CreateFrame("Button", nil, pick.frame)
         t:SetSize(TW, TH)
         t:SetPoint("TOPLEFT", 14 + ((i - 1) % PER) * (TW + GAP), y - math.floor((i - 1) / PER) * (TH + GAP))
-        t:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+        t.art = UI.Stretch(t, "tile_navy", "BACKGROUND", TH / 154 * 0.9)
         t.tex = t:CreateTexture(nil, "ARTWORK")
-        t.tex:SetPoint("TOPLEFT", 2, -2); t.tex:SetPoint("BOTTOMRIGHT", -2, 2)
+        t.tex:SetPoint("TOPLEFT", 8, -6); t.tex:SetPoint("BOTTOMRIGHT", -8, 6)
         t.tex:SetTexture(ns.SplashArt("Catch", b[1]))
         local hl = t:CreateTexture(nil, "HIGHLIGHT")
-        hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.06)
+        hl:SetPoint("TOPLEFT", 6, -6); hl:SetPoint("BOTTOMRIGHT", -6, 6)
+        hl:SetColorTexture(1, 1, 1, 0.15)
+        t.gem = t:CreateTexture(nil, "OVERLAY")
+        UI.Gem(t.gem, "blue")
+        t.gem:SetSize(18, 18)
+        t.gem:SetPoint("CENTER", t, "TOPRIGHT", -4, -4)
+        t.gem:Hide()
+        t:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(b[2])
+            GameTooltip:AddLine("Click to always show this one.", 0.7, 0.7, 0.7)
+            GameTooltip:Show()
+        end)
+        t:SetScript("OnLeave", function() GameTooltip:Hide() end)
         t:SetScript("OnClick", function()
             UI.Sound("on")
-            ns.db.splashBanner = i
+            ns.db.splashBannerKey = b[1]
             UI.Later(function() p:Refresh(); ns.Splash:Preview() end)
         end)
         thumbs[i] = t
     end
-    pick:Toggle{ label = "A different one each catch", get = function() return (ns.db.splashBanner or 0) < 1 end,
-        set = function(v) ns.db.splashBanner = v and 0 or (ns.db.lastSplashBanner or 1) end }
+    pick:Toggle{ label = "A different one each catch", get = function() return (ns.db.splashBannerKey or "") == "" end,
+        set = function(v) ns.db.splashBannerKey = v and "" or (ns.db.lastSplashBannerKey or list[1][1]) end }
     pick:Toggle{ label = "Show misses too", key = "splashMisses",
         desc = "\"Missed!\" when you reel in empty, \"Zzz...\" when the cast runs out." }
     pick:Toggle{ label = "Play a sound when caught", key = "splashCatchSound",
@@ -306,15 +325,17 @@ local function AddSplashCards(p)
     pick:Buttons{ { "Show me", function() ns.Splash:Preview() end, width = 120 },
         { "Show a miss", function() ns.Splash:PreviewMiss() end, width = 120 } }
     p:OnRefresh(function()
-        local cur = ns.db.splashBanner or 0
-        if cur >= 1 then ns.db.lastSplashBanner = cur end
+        local key = ns.db.splashBannerKey or ""
+        if key ~= "" then ns.db.lastSplashBannerKey = key end
+        local cur = 0
+        for i, b in ipairs(list) do if b[1] == key then cur = i end end
         for i, t in ipairs(thumbs) do
+            t.art:SetArt(i == cur and "tile_parch" or "tile_navy")
+            t.gem:SetShown(i == cur)
             if i == cur then
-                t:SetBackdropColor(1, 0.82, 0, 0.18); t:SetBackdropBorderColor(1, 0.82, 0, 0.9)
-                t.tex:SetDesaturated(false); t.tex:SetAlpha(1)
+                t.tex:SetAlpha(1)
             else
-                t:SetBackdropColor(0, 0, 0, 0.3); t:SetBackdropBorderColor(1, 1, 1, 0.15)
-                t.tex:SetDesaturated(false); t.tex:SetAlpha(cur < 1 and 1 or 0.55)
+                t.tex:SetAlpha(cur < 1 and 1 or 0.55)
             end
         end
     end)
@@ -364,6 +385,11 @@ function ShowBindHelp()
     Line("\"Enable Interact Key\" isn't needed: Rubber Ducky turns on what it needs while you fish. "
         .. "Turn it on if you also want the key for NPCs, mail and so on.", "GameFontDisableSmall")
     Line("No key handy? Pick a controller trigger instead: it works without any binding.", "GameFontDisableSmall")
+    -- on a controller: nothing to pick here, so B closes it
+    if ns.Pad and ns.Pad.Attach then
+        ns.Pad.Attach(w, { roots = function() return {} end,
+            badges = function(nav) if w.close then nav:Badge(w.close, "PAD2", "TOPLEFT", 2, -2, 22) end end })
+    end
 end
 
 local function OneButtonPage()
@@ -437,7 +463,7 @@ local function CatchPage()
     loot:Toggle{ label = "Auto loot your catch", key = "autoLootFishing",
         desc = "Your catch goes straight to your bags." }
     AddSplashCards(p)
-    p:ResetTool{ extra = { "splashBanner" } }
+    p:ResetTool{ extra = { "splashBannerKey" } }
     return p
 end
 
@@ -465,6 +491,22 @@ local function MacroRow(card, iconTex, pickup, what)
     local sub = card.frame:CreateFontString(nil, "OVERLAY", card:Font("small"))
     sub:SetPoint("TOPLEFT", head, "BOTTOMLEFT", 0, -6)
     sub:SetText("A macro that opens and closes " .. what .. ", handy on a controller.")
+end
+
+local function TacklePage()
+    local p = UI.NewPage{ title = "Tackle wheel", subtitle = "Your lures, camp gear and favourite places, on one wheel.",
+        icon = ns.MEDIA .. "Tackle\\icon_wheel", crop = false }
+    local c = p:Card("The wheel")
+    c:Text("Two pages. Fishing: up to four of your lures round the top (hold your pole, pick one and it goes straight on); Mrrl's, your journal and Ducky's Challenges along the bottom, Professions on the left. Camp: your campfire kits, any camp features you carry (from any profession) and fishing foods. Out of combat for now.", true)
+    c:Buttons{ { "Open the wheel", function() if ns.Tackle then ns.Tackle:Open() end end, width = 160 } }
+    c:Text("With a mouse: point and click, and the mouse wheel turns the page. With a controller: the right stick points, A picks, LB and RB turn the page, B closes.", true)
+    local m = p:Card("Opening the wheel")
+    m:Toggle{ label = "Show the tackle box on the fishing log", key = "tackleOnLog",
+        desc = "It sits on the stones by the fishing duck. Click it to open the wheel.",
+        onChange = function(on) if ns.Log and ns.Log.tackleButton then ns.Log.tackleButton:SetShown(on) end end }
+    MacroRow(m, "Interface\\Icons\\INV_G_FishingBobber_05", function() if ns.Tackle then ns.Tackle:PickupMacro() end end, "the tackle wheel")
+    m:Text("Or type /ducky tackle.", true)
+    return p
 end
 
 local function JournalPage()
@@ -501,6 +543,9 @@ local function LogPage()
         desc = "It goes away when the pole comes off. The X closes it until next time." }
     c:Choice{ label = "Size", options = { { 0.8, "Small" }, { 1, "Medium" }, { 1.25, "Large" } }, key = "logScale",
         onChange = function() ns.Log:Apply() end, maxWidth = 110 }
+    c:Toggle{ label = "Tell me when I can learn the next fishing rank", key = "rankAlert",
+        desc = "A banner under the log when your skill reaches its cap. Hover it for where to go.",
+        onChange = function() if ns.Rank then ns.Safe(ns.Rank.Update) end end }
     c:Buttons{ { "Open the log", function() ns.Log:Show() end, width = 140 },
         { "Start a new session", function() ns.Log:NewSession() end, width = 170 } }
     c:Text("Drag the board to move it. The reset icon up top puts it back.", true)
@@ -616,6 +661,7 @@ local function Build()
     local list = {
         { "poleswap", "Pole swap", PoleSwapPage }, { "sound", "Sound", SoundPage }, { "camera", "Camera", CameraPage },
         { "bobber", "Bobber", BobberPage }, { "onebutton", "One-button fishing", OneButtonPage },
+        { "tackle", "Tackle wheel", TacklePage },
         { "catch", "Your catch", CatchPage }, { "log", "Fishing log", LogPage },
         { "journal", "Fishing journal", JournalPage }, { "flair", "Fishing flair", FlairPage },
         { "developer", "Developer", DeveloperPage },

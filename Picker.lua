@@ -81,7 +81,7 @@ local function Build()
     local fs = 0.55
     local side = 46 * fs + 10
     win = ns.SettingsWindow.Chrome("RubberDuckyIconPicker", nil, { title = "Choose your bobber", frame = fs,
-        width = gridW + side * 2 + 30, height = viewH + FOOT + 44 * fs + 22 + 46 * fs + 30, scale = 1,
+        width = gridW + side * 2 + 42, -- room for the scroll bar height = viewH + FOOT + 44 * fs + 22 + 46 * fs + 30, scale = 1,
         strata = "FULLSCREEN_DIALOG" })
     local L, T = win.inner[1], win.inner[2]
 
@@ -217,7 +217,8 @@ local function Build()
 
     win:SetScript("OnShow", Refresh)
     -- a controller: the D-pad picks, A chooses, B closes
-    Picker.pad = ns.Pad.Attach(win, { roots = function() return { win } end })
+    Picker.pad = ns.Pad.Attach(win, { roots = function() return { win } end,
+        badges = function(nav) if win.close then nav:Badge(win.close, "PAD2", "TOPLEFT", 2, -2, 22) end end })
 end
 
 -- open with the bobber you've got in view

@@ -144,17 +144,68 @@ local ATLAS_NAME = { PAD1 = { "A", "Cross", "B" }, PAD2 = { "B", "Circle", "A" }
     PAD4 = { "Y", "Triangle", "X" }, PADLSHOULDER = { "LShoulder", "LShoulder", "LShoulder" },
     PADRSHOULDER = { "RShoulder", "RShoulder", "RShoulder" }, PADBACK = { "View", "Share", "Minus" }, DPAD = { "DPad", "DPad", "DPad" },
     PADRSTICK = { "RStickIn", "RStickIn", "RStickIn" } }
+local ATLAS_ALT = {}
+-- The game's own prompt pictures (white letters on a dark button), named like
+-- "Gamepad-Xbox1-ButtonA-Normal", "Gamepad-Xbox1-Trigger-LB-Normal" and
+-- "Gamepad-Xbox1-View-Normal" (Forever's Xbox set). Found by trying the likely
+-- names once, then remembered.
+local PROMPT_DEV = { xbox = { "Xbox1", "XboxSeries", "Xbox" }, playstation = { "PS5", "PS4", "PlayStation" },
+    switch = { "Switch", "SwitchPro" } }
+local PROMPT_BTN = {
+    PAD1 = { { "A" }, { "Cross" }, { "B" } }, PAD2 = { { "B" }, { "Circle" }, { "A" } },
+    PAD3 = { { "X" }, { "Square" }, { "Y" } }, PAD4 = { { "Y" }, { "Triangle" }, { "X" } },
+    PADLSHOULDER = { { "LB" }, { "L1" }, { "L" } }, PADRSHOULDER = { { "RB" }, { "R1" }, { "R" } },
+    PADBACK = { { "View", "Back" }, { "Share", "Create" }, { "Minus" } },
+    PADRSTICK = { { "RS", "R3" }, { "R3", "RS" }, { "RS", "R3" } },
+    DPAD = { { "DPad", "Dpad" }, { "DPad", "Dpad" }, { "DPad", "Dpad" } },
+}
+local PROMPT_KIND = { "Face", "Button", "Bumper", "Shoulder", "Trigger", "Menu", "System", "Special", "Stick", "Thumbstick", "DPad", "Dpad" }
+local promptFound = {}
+local function PromptAtlas(button, t)
+    local key = button .. ":" .. t
+    if promptFound[key] ~= nil then return promptFound[key] or nil end
+    promptFound[key] = false
+    local names = PROMPT_BTN[button] and PROMPT_BTN[button][t == "xbox" and 1 or t == "playstation" and 2 or 3]
+    if not (names and C_Texture and C_Texture.GetAtlasInfo) then return nil end
+    local function Has(n) local ok, info = pcall(C_Texture.GetAtlasInfo, n); return ok and info end
+    for _, dev in ipairs(PROMPT_DEV[t] or PROMPT_DEV.xbox) do
+        for _, nm in ipairs(names) do
+            for _, kind in ipairs(PROMPT_KIND) do
+                local atlas = "Gamepad-" .. dev .. "-" .. kind .. "-" .. nm .. "-Normal"
+                if Has(atlas) then promptFound[key] = atlas; return atlas end
+            end
+            -- face buttons: "ButtonA"; View on its own: "View"
+            for _, atlas in ipairs({ "Gamepad-" .. dev .. "-Button" .. nm .. "-Normal", "Gamepad-" .. dev .. "-" .. nm .. "-Normal" }) do
+                if Has(atlas) then promptFound[key] = atlas; return atlas end
+            end
+        end
+    end
+    return nil
+end
+OK.PromptAtlas = PromptAtlas
+
 function OK.Glyph(button, size)
     local t = OK.PadType()
+    local prompt = PromptAtlas(button, t)
+    if prompt then
+        -- keep its shape (the shoulder buttons are wider than tall)
+        local ok, info = pcall(C_Texture.GetAtlasInfo, prompt)
+        -- these have a little room round the button, so they're drawn a size up
+        local h = math.floor((size or 16) * 1.4 + 0.5)
+        local w = (ok and info and info.width and info.height and info.height > 0) and math.floor(h * info.width / info.height + 0.5) or h
+        return ("|A:%s:%d:%d|a"):format(prompt, h, w)
+    end
     local style = ICON_STYLE[t]
     local n = ATLAS_NAME[button] and ATLAS_NAME[button][t == "xbox" and 1 or t == "playstation" and 2 or 3]
     if n and C_Texture and C_Texture.GetAtlasInfo then
         -- the pad's own picture, or the game's generic one (the sticks only have those)
-        for _, st in ipairs({ style, "Gen" }) do
-            for _, sfx in ipairs({ "_64", "_32", "" }) do
-                local atlas = "Gamepad_" .. st .. "_" .. n .. sfx
-                local ok, info = pcall(C_Texture.GetAtlasInfo, atlas)
-                if ok and info then return ("|A:%s:%d:%d|a"):format(atlas, size or 16, size or 16) end
+        for _, nm in ipairs({ n, ATLAS_ALT[button] }) do
+            for _, st in ipairs({ style, "Gen" }) do
+                for _, sfx in ipairs({ "_64", "_32", "" }) do
+                    local atlas = "Gamepad_" .. st .. "_" .. nm .. sfx
+                    local ok, info = pcall(C_Texture.GetAtlasInfo, atlas)
+                    if ok and info then return ("|A:%s:%d:%d|a"):format(atlas, size or 16, size or 16) end
+                end
             end
         end
     end

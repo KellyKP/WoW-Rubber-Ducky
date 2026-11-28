@@ -42,6 +42,8 @@ UI.SOUNDS = {
     shopOpen = "UI_IG_STORE_WINDOW_OPEN_BUTTON", shopClose = "UI_IG_STORE_WINDOW_CLOSE_BUTTON",
     shopPage = "UI_IG_STORE_PAGE_NAV_BUTTON", shopBuy = "UI_IG_STORE_BUY_BUTTON",
     shopBought = "UI_IG_STORE_CONFIRM_PURCHASE_BUTTON", murloc = "MURLOC_AGGRO",
+    -- the tackle wheel: a tackle box opening and shutting
+    tackleOpen = "IG_BACKPACK_OPEN", tackleClose = "IG_BACKPACK_CLOSE",
 }
 local KIT_IDS = {
     IG_MAINMENU_OPEN = 850, IG_MAINMENU_CLOSE = 851, IG_MAINMENU_OPTION = 852,
@@ -52,6 +54,7 @@ local KIT_IDS = {
     UI_IG_STORE_WINDOW_OPEN_BUTTON = 39512, UI_IG_STORE_WINDOW_CLOSE_BUTTON = 39513,
     UI_IG_STORE_PAGE_NAV_BUTTON = 39511, UI_IG_STORE_BUY_BUTTON = 39515,
     UI_IG_STORE_CONFIRM_PURCHASE_BUTTON = 39516, MURLOC_AGGRO = 416,
+    IG_BACKPACK_OPEN = 862, IG_BACKPACK_CLOSE = 863,
 }
 function UI.Sound(what)
     local name = UI.SOUNDS[what] or what
@@ -65,12 +68,16 @@ function UI.Click(on) UI.Sound(on and "on" or "off") end
 -- Art: Kelly's wood, gold, navy and parchment pieces (Media\UI). Each piece
 -- stretches only along its plain stretches (xb across, yb down), so leaves,
 -- gems, splashes and shells keep their shape at any size. Sizes are in the
--- art's own pixels: aw x ah of a w x h texture.
+-- art's own pixels: aw x ah of a w x h texture (file: the texture, when it
+-- isn't named after the piece; ox, oy: where the piece starts in it).
 -------------------------------------------------------------------------------
 
 local ART_DIR = ns.MEDIA .. "UI\\"
 UI.ART = {
     frame = { w = 1024, h = 512, aw = 615, ah = 406, xb = { { 185, 500 } }, yb = { { 200, 255 } }, close = { 566, 41, 29 } },
+    -- the same frame with its navy opening cut away: drawn again over the page,
+    -- so the splash, leaves and banner sit in front of what's in the window
+    frame_top = { w = 1024, h = 512, aw = 615, ah = 406, xb = { { 185, 500 } }, yb = { { 200, 255 } } },
     sign_welcome = { w = 1024, h = 256, aw = 1024, ah = 250 },
     sign_challenges = { w = 1024, h = 256, aw = 1024, ah = 254 },
     sign_settings = { w = 1024, h = 256, aw = 1024, ah = 232 },
@@ -86,6 +93,14 @@ UI.ART = {
     medals = { w = 1024, h = 256, aw = 1024, ah = 256 },
     plate = { w = 1024, h = 256, aw = 1002, ah = 193, xb = { { 350, 820 } }, ring = { 135, 95, 175 }, body = { 300, 58, 850, 150 } },
     plate_locked = { w = 1024, h = 256, aw = 1002, ah = 214, xb = { { 350, 820 } }, ring = { 135, 105, 190 }, body = { 300, 62, 880, 160 } },
+    -- the rope-and-gold scroll bar, all in one texture (ox, oy: where each piece starts)
+    scroll_thumb = { file = "scroll", w = 512, h = 512, ox = 0, oy = 0, aw = 85, ah = 206, yb = { { 46, 160 } } },
+    scroll_thumb_hover = { file = "scroll", w = 512, h = 512, ox = 87, oy = 0, aw = 86, ah = 209, yb = { { 47, 162 } } },
+    scroll_thumb_down = { file = "scroll", w = 512, h = 512, ox = 175, oy = 0, aw = 85, ah = 206, yb = { { 46, 160 } } },
+    scroll_track = { file = "scroll", w = 512, h = 512, ox = 349, oy = 0, aw = 71, ah = 209, yb = { { 32, 177 } } },
+    tab_on = { w = 256, h = 64, aw = 144, ah = 46, xb = { { 44, 100 } } },
+    tab_off = { w = 128, h = 64, aw = 91, ah = 38, xb = { { 24, 67 } } },
+    tab_rule = { w = 32, h = 16, aw = 30, ah = 12, xb = { { 2, 28 } } },
     plate_bar = { w = 1024, h = 256, aw = 1024, ah = 236, xb = { { 377.7, 797.4 } }, ring = { 146.9, 117.5, 218.2 }, body = { 293.8, 62.1, 864.5, 137.7 }, bar = { 329, 147.7, 831, 171.2 } },
 }
 local ART = UI.ART
@@ -143,11 +158,12 @@ function UI.Stretch(frame, name, layer, s, level)
                     t = frame:CreateTexture(nil, layer or "BACKGROUND", nil, level)
                     self.tex[i] = t
                 end
-                t:SetTexture(ART_DIR .. self.name)
+                t:SetTexture(ART_DIR .. (a.file or self.name))
                 t:ClearAllPoints()
                 t:SetPoint("TOPLEFT", frame, "TOPLEFT", x, -y)
                 t:SetSize(math.max(0.01, ws[c]), math.max(0.01, hs[r]))
-                t:SetTexCoord(col[1] / a.w, col[2] / a.w, row[1] / a.h, row[2] / a.h)
+                local ox, oy = a.ox or 0, a.oy or 0
+                t:SetTexCoord((ox + col[1]) / a.w, (ox + col[2]) / a.w, (oy + row[1]) / a.h, (oy + row[2]) / a.h)
                 t:SetShown(ws[c] > 0.05 and hs[r] > 0.05)
                 x = x + ws[c]
             end
@@ -569,9 +585,24 @@ end
 local Page = {}
 Page.__index = Page
 
--- A slim gold scroll bar on a navy track, in place of the game's grey one, and
--- only while there's something to scroll. The game's bar keeps working out of
--- sight (the mouse wheel goes through it); ours just shows and drags it.
+-- The scroll bar: a blue glass track in gold, a rope-bound gold thumb, and an
+-- arrow at each end, in place of the game's grey one, and only while there's
+-- something to scroll. It sits just right of the list: leave UI.SCROLL_ROOM
+-- free there. The game's bar keeps working out of sight (the mouse wheel goes
+-- through it); ours shows and drags it.
+local SB_W = 24                -- the bar, arrows and all
+local SB_TRACK = 18            -- the glass track
+local SB_S = SB_TRACK / 71     -- art pixels -> bar
+UI.SCROLL_ROOM = SB_W + 6
+-- the arrows in scroll.blp: normal, hover, pressed, greyed
+local ARROWS = {
+    up = { { 0, 212, 93, 93 }, { 95, 212, 95, 92 }, { 192, 212, 96, 93 }, { 290, 212, 92, 93 } },
+    down = { { 0, 308, 92, 90 }, { 94, 308, 94, 90 }, { 190, 308, 94, 90 }, { 286, 308, 92, 90 } },
+}
+local function ArrowArt(t, r)
+    t:SetTexture(ART_DIR .. "scroll")
+    t:SetTexCoord(r[1] / 512, (r[1] + r[3]) / 512, r[2] / 512, (r[2] + r[4]) / 512)
+end
 function UI.SlimScrollBar(scroll, parent)
     local bar = rawget(scroll, "ScrollBar") or scroll.ScrollBar
     if type(bar) ~= "table" then
@@ -585,51 +616,112 @@ function UI.SlimScrollBar(scroll, parent)
             if type(bar[k]) == "table" then bar[k]:EnableMouse(false) end
         end
     end
-    local track = CreateFrame("Frame", nil, parent)
-    track:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 5, -2)
-    track:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 5, 2)
-    track:SetWidth(6)
-    local bg = track:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(); bg:SetColorTexture(NAVY[1], NAVY[2], NAVY[3], 0.9)
-    local thumb = CreateFrame("Button", nil, track)
-    thumb:SetWidth(6)
-    local tt = thumb:CreateTexture(nil, "ARTWORK")
-    tt:SetAllPoints(); tt:SetColorTexture(GOLD[1], GOLD[2] * 0.85, 0.15, 0.95)
     local function Range() return scroll:GetVerticalScrollRange() or 0 end
-    local function Paint()
-        local range = Range()
-        track:SetShown(range > 1)
-        if range <= 1 then return end
-        local h = track:GetHeight() or 1
-        local view = scroll:GetHeight() or 1
-        local th = math.max(24, h * view / (view + range))
-        thumb:SetHeight(th)
-        local pos = (scroll:GetVerticalScroll() or 0) / range
-        thumb:ClearAllPoints()
-        thumb:SetPoint("TOP", track, "TOP", 0, -(h - th) * pos)
-    end
     local function ScrollTo(v)
         v = math.max(0, math.min(Range(), v))
         if bar and bar.SetValue then bar:SetValue(v) else scroll:SetVerticalScroll(v) end
     end
+    local holder = CreateFrame("Frame", nil, parent)
+    holder:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 4, 0)
+    holder:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 4, 0)
+    holder:SetWidth(SB_W)
+    holder:SetFrameLevel((scroll:GetFrameLevel() or 1) + 4)
+    -- the arrows: a nudge each
+    local function Arrow(which, point, dir)
+        local b = CreateFrame("Button", nil, holder)
+        local r = ARROWS[which]
+        b:SetSize(SB_W, SB_W * r[1][4] / r[1][3])
+        b:SetPoint(point)
+        local n, h, p = b:CreateTexture(nil, "ARTWORK"), b:CreateTexture(nil, "HIGHLIGHT"), b:CreateTexture(nil, "ARTWORK")
+        ArrowArt(n, r[1]); ArrowArt(h, r[2]); ArrowArt(p, r[3])
+        n:SetAllPoints(); h:SetAllPoints(); p:SetAllPoints()
+        b:SetNormalTexture(n); b:SetHighlightTexture(h); b:SetPushedTexture(p)
+        b:SetScript("OnClick", function() ScrollTo((scroll:GetVerticalScroll() or 0) + dir * 40); UI.Sound("tick") end)
+        return b
+    end
+    local up = Arrow("up", "TOP", -1)
+    local down = Arrow("down", "BOTTOM", 1)
+    up:SetFrameLevel(holder:GetFrameLevel() + 5); down:SetFrameLevel(holder:GetFrameLevel() + 5) -- over the track's ends
+    local track = CreateFrame("Frame", nil, holder)
+    track:SetPoint("TOP", up, "BOTTOM", 0, 3)
+    track:SetPoint("BOTTOM", down, "TOP", 0, -3)
+    track:SetWidth(SB_TRACK)
+    track.art = UI.Stretch(track, "scroll_track", "BACKGROUND", SB_S)
+    local thumb = CreateFrame("Button", nil, track)
+    thumb:SetWidth(SB_TRACK * 85 / 71)
+    thumb:SetFrameLevel(track:GetFrameLevel() + 2)
+    thumb.art = UI.Stretch(thumb, "scroll_thumb", "ARTWORK", SB_S)
+    thumb:SetScript("OnEnter", function(self) if not self.from then self.art:SetArt("scroll_thumb_hover") end end)
+    thumb:SetScript("OnLeave", function(self) if not self.from then self.art:SetArt("scroll_thumb") end end)
+    -- the gold inside the glass: the room the thumb moves in
+    local INSET = 4
+    local function Paint()
+        local range = Range()
+        holder:SetShown(range > 1 and scroll:IsShown())
+        if range <= 1 then return end
+        local h = (track:GetHeight() or 1) - 2 * INSET
+        local view = scroll:GetHeight() or 1
+        local th = math.max(40, h * view / (view + range))
+        thumb:SetHeight(th)
+        thumb.art:Layout()
+        local pos = (scroll:GetVerticalScroll() or 0) / range
+        thumb:ClearAllPoints()
+        thumb:SetPoint("TOP", track, "TOP", 0, -INSET - (h - th) * pos)
+    end
+    track:SetScript("OnSizeChanged", function() track.art:Layout(); Paint() end)
     thumb:RegisterForDrag("LeftButton")
     thumb:SetScript("OnDragStart", function(self)
         local _, y = GetCursorPosition()
         self.from, self.start = y / (self:GetEffectiveScale() or 1), scroll:GetVerticalScroll() or 0
+        self.art:SetArt("scroll_thumb_down")
         self:SetScript("OnUpdate", function(me)
             local _, cy = GetCursorPosition()
             cy = cy / (me:GetEffectiveScale() or 1)
-            local h, th = track:GetHeight() or 1, me:GetHeight() or 1
+            local h, th = (track:GetHeight() or 1) - 2 * INSET, me:GetHeight() or 1
             local per = Range() / math.max(1, h - th)
             ScrollTo(me.start + (me.from - cy) * per)
         end)
     end)
-    thumb:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
+    thumb:SetScript("OnDragStop", function(self)
+        self:SetScript("OnUpdate", nil); self.from = nil
+        self.art:SetArt(self:IsMouseOver() and "scroll_thumb_hover" or "scroll_thumb")
+    end)
+    -- soft edges: the list fades into the window's navy where there's more
+    -- past the edge, instead of being cut off in a hard line
+    local FADE_H, NAVY = 18, { 0.114, 0.149, 0.196 }
+    local fades = CreateFrame("Frame", nil, parent)
+    fades:SetAllPoints(scroll)
+    fades:SetFrameLevel((scroll:GetFrameLevel() or 1) + 12)
+    fades:EnableMouse(false)
+    local function Fade(top)
+        local t = fades:CreateTexture(nil, "OVERLAY")
+        t:SetHeight(FADE_H)
+        t:SetPoint(top and "TOPLEFT" or "BOTTOMLEFT"); t:SetPoint(top and "TOPRIGHT" or "BOTTOMRIGHT")
+        t:SetColorTexture(1, 1, 1, 1)
+        local r, g, b = NAVY[1], NAVY[2], NAVY[3]
+        -- SetGradient goes bottom (first colour) to top (second)
+        local lo, hi = top and 0 or 1, top and 1 or 0
+        local ok = CreateColor and pcall(t.SetGradient, t, "VERTICAL", CreateColor(r, g, b, lo), CreateColor(r, g, b, hi))
+        if not ok and t.SetGradientAlpha then ok = pcall(t.SetGradientAlpha, t, "VERTICAL", r, g, b, lo, r, g, b, hi) end
+        if not ok then t:SetAlpha(0) end
+        return t
+    end
+    local fadeTop, fadeBottom = Fade(true), Fade(false)
+    local Paint1 = Paint
+    Paint = function()
+        Paint1()
+        local range, at = Range(), scroll:GetVerticalScroll() or 0
+        fades:SetShown(scroll:IsShown())
+        fadeTop:SetShown(range > 1 and at > 1)
+        fadeBottom:SetShown(range > 1 and at < range - 1)
+    end
     scroll:HookScript("OnVerticalScroll", Paint)
     scroll:HookScript("OnScrollRangeChanged", Paint)
     scroll:HookScript("OnShow", Paint)
-    track:Hide()
-    return track
+    scroll:HookScript("OnHide", function() holder:Hide(); fades:Hide() end)
+    holder:Hide()
+    holder.Paint = Paint
+    return holder
 end
 
 function UI.NewPage(o)
@@ -655,7 +747,7 @@ function UI.NewPage(o)
 
     local scroll = CreateFrame("ScrollFrame", nil, f, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", 4, -(HEAD_H + 8))
-    scroll:SetPoint("BOTTOMRIGHT", -16, 6)
+    scroll:SetPoint("BOTTOMRIGHT", -UI.SCROLL_ROOM, 6)
     local content = CreateFrame("Frame", nil, scroll)
     content:SetSize(620, 400)
     scroll:SetScrollChild(content)
@@ -940,3 +1032,87 @@ function Page:Refresh()
     for _, fn in ipairs(self.refreshers) do fn(self) end
     self:Layout()
 end
+
+-------------------------------------------------------------------------------
+-- A row of tabs along the top of a window: closed navy tabs sitting on a gold
+-- line, and the one you're on standing taller, open into the page below.
+--   UI.TabRow(parent, items, onClick, o) -> row
+--   items: { { key, label }, ... }; onClick(key)
+--   o.inset: room at each end (for the LB and RB badges); o.gap between tabs
+--   row:Place(left, top, width) inside parent; row:Select(key); row.buttons
+-------------------------------------------------------------------------------
+
+local TAB_ON_H, TAB_OFF_H, RULE_H = 46, 38, 12
+UI.TAB_ROW_H = TAB_ON_H
+
+function UI.TabRow(parent, items, onClick, o)
+    o = o or {}
+    local row = { buttons = {}, inset = o.inset or 30, gap = o.gap or 4 }
+    local level = (parent:GetFrameLevel() or 1) + 5
+    row.rule = CreateFrame("Frame", nil, parent)
+    row.rule:SetFrameLevel(level)
+    row.rule:SetHeight(RULE_H)
+    row.rule.art = UI.Stretch(row.rule, "tab_rule", "BACKGROUND", 1)
+    for i, it in ipairs(items) do
+        local b = CreateFrame("Button", nil, parent)
+        b:SetFrameLevel(level + 1)
+        b.key = it[1]
+        -- closed: the short tab; open: the tall one, a little wider so its
+        -- gold runs into the line either side
+        b.off = CreateFrame("Frame", nil, b)
+        b.off:SetPoint("BOTTOMLEFT"); b.off:SetPoint("BOTTOMRIGHT")
+        b.off:SetHeight(TAB_OFF_H)
+        b.off.art = UI.Stretch(b.off, "tab_off", "BACKGROUND", 1)
+        b.on = CreateFrame("Frame", nil, b)
+        b.on:SetPoint("BOTTOMLEFT", -12, 0); b.on:SetPoint("BOTTOMRIGHT", 12, 0)
+        b.on:SetHeight(TAB_ON_H)
+        b.on:SetFrameLevel(level + 2)
+        b.on.art = UI.Stretch(b.on, "tab_on", "BACKGROUND", 1)
+        -- the label on a layer of its own, above both tab pieces
+        b.face = CreateFrame("Frame", nil, b)
+        b.face:SetAllPoints()
+        b.face:SetFrameLevel(level + 3)
+        b.text = b.face:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        b.text:SetWordWrap(false)
+        b.text:SetText(it[2])
+        b.label = it[2]
+        local hl = b:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetPoint("BOTTOMLEFT", 16, 8); hl:SetPoint("TOPRIGHT", -16, -14)
+        hl:SetColorTexture(1, 1, 1, 0.07)
+        b:SetScript("OnClick", function() if onClick then onClick(it[1]) end end)
+        row.buttons[i] = b
+    end
+
+    function row:Place(left, top, width)
+        local n = #self.buttons
+        local tw = (width - 2 * self.inset - self.gap * (n - 1)) / n
+        self.rule:ClearAllPoints()
+        self.rule:SetPoint("TOPLEFT", parent, "TOPLEFT", left, -(top + TAB_ON_H - RULE_H))
+        self.rule:SetWidth(width)
+        self.rule.art:Layout()
+        for i, b in ipairs(self.buttons) do
+            b:ClearAllPoints()
+            b:SetSize(tw, TAB_ON_H)
+            b:SetPoint("TOPLEFT", parent, "TOPLEFT", left + self.inset + (i - 1) * (tw + self.gap), -top)
+            b.off.art:Layout(); b.on.art:Layout()
+        end
+        self.tabW = tw
+        self:Select(self.selected)
+    end
+
+    function row:Select(key)
+        self.selected = key
+        for _, b in ipairs(self.buttons) do
+            local on = b.key == key
+            b.on:SetShown(on); b.off:SetShown(not on)
+            b.text:ClearAllPoints()
+            -- in the middle of the tab's face: the tall one's sits higher
+            b.text:SetPoint("CENTER", b, "BOTTOM", 0, on and 24 or 20)
+            b.text:SetFontObject(on and "GameFontNormal" or "GameFontHighlightSmall")
+            b.text:SetText(b.label)
+            if ns.Squeeze and self.tabW then ns.Squeeze(b.text, self.tabW - 34, 8) end
+        end
+    end
+    return row
+end
+

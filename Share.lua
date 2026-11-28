@@ -120,14 +120,16 @@ local function Build()
     well:SetPoint("TOPLEFT", L, -(T + 20)); well:SetPoint("BOTTOMRIGHT", -R, B + 48)
     local scroll = CreateFrame("ScrollFrame", nil, win, "UIPanelScrollFrameTemplate")
     scroll:SetPoint("TOPLEFT", L + 6, -(T + 26))
-    scroll:SetPoint("BOTTOMRIGHT", -(R + 18), B + 54)
+    scroll:SetPoint("BOTTOMRIGHT", -(R + 6 + ns.UI.SCROLL_ROOM), B + 54)
     local edit = CreateFrame("EditBox", nil, scroll)
     edit:SetMultiLine(true)
     edit:SetAutoFocus(false)
     edit:SetFontObject(ChatFontNormal)
-    edit:SetWidth(540 - L - R - 30)
+    -- inside the scrolling box, clear of the scroll bar beside it
+    edit:SetWidth(540 - L - R - 12 - ns.UI.SCROLL_ROOM - 8)
     edit:SetScript("OnEscapePressed", function() win:Hide() end)
     scroll:SetScrollChild(edit)
+    ns.UI.SlimScrollBar(scroll, win) -- the same rope-and-glass bar as everywhere else
     win.edit = edit
 
     win.apply = ns.UI.Button(win, "Apply", 140, function() end, { height = 42 })
@@ -141,6 +143,13 @@ local function Build()
             win.note:SetText("|cffff8080No Rubber Ducky settings found in that text.|r")
         end
     end)
+
+    -- on a controller: A on Apply, the D-pad scrolls the text, B closes
+    if ns.Pad and ns.Pad.Attach then
+        Share.pad = ns.Pad.Attach(win, { roots = function() return win.apply:IsShown() and { win.apply } or {} end,
+            scroll = function() return scroll end,
+            badges = function(nav) if win.close then nav:Badge(win.close, "PAD2", "TOPLEFT", 2, -2, 22) end end })
+    end
 end
 
 function Share:ShowCopy()

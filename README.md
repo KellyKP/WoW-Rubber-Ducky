@@ -20,6 +20,8 @@ Rubber Ducky makes fishing easier on the ears and eyes. It hushes the world so t
 - **Shiny Fishbones.** Now and then one comes up with your catch, and every challenge pays some. They turn up more often by a Fishing Rack or Fishing Hut, in a Lucky Fishing Hat, at the Stranglethorn Fishing Extravaganza, or with Fellow Ducky Anglers fishing in your zone.
 - **Mrrl's Doohicky Emporium.** Trade your Fishbones with Mrrl for bobbers, quarterboards, charms and mottos. Give him a poke and he'll chat.
 - **Fishing flair.** While your pole is out, your quarterboard hangs over your head with your name and motto, your bobber and charm swinging from it, for Fellow Ducky Anglers to see. Yours hangs off the top of the fishing log.
+- **Tackle wheel.** Your lures, Mrrl's, the journal, Ducky's Challenges and the Professions window on one ring, with a second page for your campfire kits, camp features from any profession and fishing foods. Open it from the tackle box by the fishing log, the Lures macro or `/ducky tackle`. Point with the mouse or the right stick. Out of combat.
+- **Rank-up reminder.** When your fishing skill hits its cap and you can learn the next rank, a banner pops up under the fishing log. Hover it for where to find a trainer. With nothing tracked, the plank on the log shows your fishing skill.
 - **Pole swap.** Drag the Pole swap icon onto any action bar or crossbar slot. One press puts your fishing pole on, and the next puts back the weapon you had before, each with its own splash and sound. It warns you if either one is broken.
 - **Share settings.** Copy your settings as text to share your setup, or paste a friend's. It's on the overview page.
 
@@ -39,12 +41,13 @@ You can also click **Rubber Ducky** in the minimap's AddOns list for a menu with
 |---|---|
 | `/ducky` | Open the settings |
 | `/ducky icons` | Pick your bobber icon |
-| `/ducky swap` | Swap between your fishing pole and your weapon, out of combat (what the Ducky Pole macro runs) |
+| `/ducky swap` | Swap between your fishing pole and your weapon, out of combat (what the Pole macro runs) |
 | `/ducky swap 1`, `/ducky swap 2` | Put on your pole (1) or your weapon (2). `pole` and `weapon` work too |
 | `/ducky log` | Open or close the fishing log |
 | `/ducky journal` | Open or close the fishing journal |
 | `/ducky challenges` | Open or close Ducky's Challenges |
 | `/ducky shop` | Visit Mrrl's Doohicky Emporium |
+| `/ducky tackle` | Open or close the tackle wheel |
 | `/ducky test` | Preview the sparkle and bobber icon |
 | `/ducky focus`, `sparkle`, `marker`, `camera`, `onekey` | Turn a feature on or off |
 | `/ducky welcome` | Show the welcome screen again |

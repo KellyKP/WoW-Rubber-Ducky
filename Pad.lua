@@ -1,5 +1,6 @@
 -- Rubber Ducky: controller support for our windows (settings, Welcome, Ducky's
--- Challenges), and the controls bar they share with the journal.
+-- Challenges, Mrrl's shop), and the little button badges that sit on what each
+-- button does, instead of a bar of hints under the window.
 --
 -- Nothing has to sign up for it: the D-pad moves between whatever on the page
 -- can be clicked, by where it sits on screen, so a new toggle or button just
@@ -11,7 +12,8 @@ local Pad = {}
 ns.Pad = Pad
 
 -------------------------------------------------------------------------------
--- The controls bar: the game's controller hints, in tooltip style, under a window.
+-- A controls bar: the game's controller hints, in tooltip style, under a window.
+-- Only the journal keeps one, for the two buttons that don't sit on anything.
 -- items: { { "PAD1", "Select" }, { "PADLSHOULDER", "PADRSHOULDER", "Pages" }, ... }
 -------------------------------------------------------------------------------
 
@@ -47,6 +49,57 @@ function Pad.NewBar(strata)
     end
     bar:Hide()
     return bar
+end
+
+
+-------------------------------------------------------------------------------
+-- Badges: the controller button's own picture, sitting on the thing it works
+-- (B on the close button, LB and RB either side of the tabs, X on Buy). Only
+-- with the Gamepad UI on.
+--   Pad.Badge(target, button, point, x, y, size, when) -> the badge
+--   point: where on the target it sits ("TOPLEFT", "LEFT", ...); x, y nudge it
+--   when(): optional; the badge hides when it says no
+-------------------------------------------------------------------------------
+
+local function UIOn() return ns.OneKey and ns.OneKey.GamepadUIOn() or false end
+
+function Pad.Badge(target, button, point, x, y, size, when)
+    size = size or 26
+    -- on a frame, or on a bit of text (then on the frame it's in)
+    local host = target.GetFrameLevel and target or target:GetParent()
+    local b = CreateFrame("Frame", nil, host)
+    b:SetSize(size, size)
+    b:SetPoint("CENTER", target, point or "TOPLEFT", x or 0, y or 0)
+    b:SetFrameLevel((host:GetFrameLevel() or 1) + 15)
+    b:EnableMouse(false)
+    b.text = b:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    b.text:SetPoint("CENTER")
+    b.button, b.size, b.when = button, size, when
+    function b:Update()
+        local show = UIOn() and (not self.when or self.when()) and true or false
+        if show then
+            local g = ns.OneKey.Glyph(self.button, self.size)
+            -- no picture in this client: the name, in a little dark pill
+            if g:sub(1, 1) == "[" then
+                if not self.pill then
+                    self.pill = self:CreateTexture(nil, "BACKGROUND")
+                    self.pill:SetColorTexture(0.08, 0.07, 0.06, 0.9)
+                end
+                g = g:sub(2, -2)
+                self.text:SetFontObject("GameFontHighlightSmall")
+                self.pill:ClearAllPoints()
+                self.pill:SetPoint("TOPLEFT", self.text, "TOPLEFT", -5, 3)
+                self.pill:SetPoint("BOTTOMRIGHT", self.text, "BOTTOMRIGHT", 5, -3)
+                self.pill:Show()
+            elseif self.pill then
+                self.pill:Hide()
+            end
+            self.text:SetText(g)
+        end
+        self:SetShown(show)
+    end
+    b:Hide()
+    return b
 end
 
 -------------------------------------------------------------------------------
@@ -114,12 +167,19 @@ local function First(items)
     return best or items[1]
 end
 
+-- the nearest list that actually scrolls (a page stacked inside another list
+-- has a scroll of its own with nothing to scroll: that one's passed over)
 local function ScrollParent(f)
     local p = f:GetParent()
+    local first
     while p do
-        if p:GetObjectType() == "ScrollFrame" then return p end
+        if p:GetObjectType() == "ScrollFrame" then
+            first = first or p
+            if (p:GetVerticalScrollRange() or 0) > 1 then return p end
+        end
         p = p:GetParent()
     end
+    return first
 end
 
 -- scroll a frame's list so it's in view
@@ -160,18 +220,22 @@ end
 -- Attach(win, o): controller support for one window.
 --   o.roots()         frames whose buttons the D-pad moves between
 --   o.pages(dir)      the shoulders: turn a page (optional)
---   o.pagesLabel      what the shoulders are called on the bar
 --   o.scroll()        with nothing to press, up and down scroll this instead
 --   o.close()         B (defaults to hiding the window)
---   o.strata          the bar's strata
+--   o.move(dir)       the D-pad does this instead of moving between buttons
+--   o.noSelect        A does nothing (the window gives its own button instead)
+--   o.extra           { button = "PAD3", fn = function() end }: one more button
+--   o.badges(nav)     put the window's badges on: nav:Badge(target, button, point, x, y, size, when)
 -------------------------------------------------------------------------------
 
 function Pad.Attach(win, o)
     o = o or {}
-    local nav = { win = win }
-    local bar = Pad.NewBar(o.strata or win:GetFrameStrata())
-    bar:SetPoint("TOP", win, "BOTTOM", 0, 14)
-    nav.bar = bar
+    local nav = { win = win, badges = {} }
+    function nav:Badge(...)
+        local b = Pad.Badge(...)
+        nav.badges[#nav.badges + 1] = b
+        return b
+    end
 
     local function Popup() return RubberDuckyPopup and RubberDuckyPopup:IsShown() and RubberDuckyPopup end
     local function Items()
@@ -184,20 +248,13 @@ function Pad.Attach(win, o)
         if s then pcall(s, f) end
     end
 
+    -- the badges follow the Gamepad UI and what's on screen
     function nav:Paint()
-        if not bar:IsShown() then return end
-        local list = {}
-        local items = Items()
-        if #items > 0 then list[#list + 1] = { "DPAD", "Move" }
-        elseif o.scroll then list[#list + 1] = { "DPAD", "Scroll" } end
-        if o.pages then list[#list + 1] = { "PADLSHOULDER", "PADRSHOULDER", o.pagesLabel or "Pages" } end
-        local cur = nav.cur
-        if cur and cur:IsVisible() then
-            if cur:GetObjectType() == "Slider" then list[#list + 1] = { "PADDLEFT", "PADDRIGHT", "Adjust" }
-            else list[#list + 1] = { "PAD1", cur:GetObjectType() == "CheckButton" and "Toggle" or "Select" } end
+        if o.badges and not nav.badged then nav.badged = true; o.badges(nav) end
+        local pop = Popup()
+        for _, b in ipairs(nav.badges) do
+            if pop then b:Hide() else b:Update() end
         end
-        list[#list + 1] = { "PAD2", Popup() and "Back" or "Close" }
-        bar:SetItems(list)
     end
 
     function nav:Focus(f)
@@ -220,6 +277,7 @@ function Pad.Attach(win, o)
     end
 
     function nav:Move(dir)
+        if o.move and not Popup() then o.move(dir); nav:Paint(); return end
         local items = Items()
         if #items == 0 then
             local scroll = o.scroll and o.scroll()
@@ -271,9 +329,12 @@ function Pad.Attach(win, o)
     nav.PAD = {
         PADDUP = function() nav:Move("up") end, PADDDOWN = function() nav:Move("down") end,
         PADDLEFT = function() nav:Move("left") end, PADDRIGHT = function() nav:Move("right") end,
-        PAD1 = function() nav:Press() end,
+        PAD1 = function() if not (o.noSelect and not Popup()) then nav:Press() end end,
         PAD2 = function() nav:Back() end,
     }
+    if o.extra then
+        nav.PAD[o.extra.button] = function() if not Popup() then o.extra.fn(); nav:Paint() end end
+    end
     if o.pages then
         nav.PAD.PADLSHOULDER = function() nav:Clear(); o.pages(-1); nav:Paint() end
         nav.PAD.PADRSHOULDER = function() nav:Clear(); o.pages(1); nav:Paint() end
@@ -285,9 +346,9 @@ function Pad.Attach(win, o)
     win:HookScript("OnShow", function()
         Pass(true)
         nav:Clear()
-        if ns.OneKey and ns.OneKey.GamepadUIOn() then bar:Show(); nav:Paint() else bar:Hide() end
+        nav:Paint()
     end)
-    win:HookScript("OnHide", function() nav:Clear(); bar:Hide() end)
+    win:HookScript("OnHide", function() nav:Clear() end)
     pcall(win.SetScript, win, "OnGamePadButtonDown", function(_, button)
         local f = nav.PAD[button]
         if f then Pass(false); f() else Pass(true) end

@@ -1,4 +1,4 @@
--- Rubber Ducky: pole swap. The "Ducky Pole" character macro runs
+-- Rubber Ducky: pole swap. The "Pole" character macro runs
 -- "/ducky swap", which equips your pole or the last weapons you held.
 
 local _, ns = ...
@@ -6,7 +6,7 @@ local Gear = {}
 ns.Gear = Gear
 
 local MH, OH = 16, 17
-local MACRO, MACRO_BODY = "Ducky Pole", "/ducky swap"
+local MACRO, MACRO_BODY = "Pole", "/ducky swap"
 local POLE_ICON = "Interface\\Icons\\INV_Fishingpole_02"
 
 local function Info(id)
@@ -111,10 +111,7 @@ function Gear:NextIcon()
     return (pole and Info(pole)) or POLE_ICON
 end
 
-local function MacroIndex()
-    local i = ns.Safe(GetMacroIndexByName, MACRO)
-    return (i and i > 0) and i or nil
-end
+local function MacroIndex() return ns.MacroIndex(MACRO) end
 
 local pending, lastIcon, waiting = false, nil, false
 
@@ -161,9 +158,31 @@ end
 -- you pressed something, so problems go to chat
 local Say = function(msg) ns.Chat(msg) end
 
+-- what Ducky says if you try mid-fight, depending on which way you were going
+Gear.FIGHT_POLE = {
+    "Whoa! Should we really fish right now? Let's wait until the fight's over!",
+    "Fishing? Mid-fight?! Let's deal with this first, then we'll cast.",
+    "The fish can wait! Let's finish this fight first.",
+    "Hold that line! No fishing till the fighting's done.",
+}
+Gear.FIGHT_WEAPON = {
+    "Whoa, not in the middle of a fight! Let's swap once it's over.",
+    "Can't swap mid-scuffle! Hang in there till the fight's done.",
+    "Hands are a bit full right now! We'll swap when the fight's over.",
+}
+
 -- target: "pole", "weapon", or nil to toggle
 function Gear:Swap(target)
-    if InCombatLockdown() then Say("Whoa, not in the middle of a fight! Swap once combat's over."); return false end
+    local function toPoleNext()
+        if target == "pole" then return true elseif target == "weapon" then return false end
+        return not Gear.PoleEquipped()
+    end
+    -- not in a fight at all, either way: a pole that goes on mid-fight can't come
+    -- off again until it's over
+    if InCombatLockdown() or (UnitAffectingCombat and UnitAffectingCombat("player")) then
+        local lines = toPoleNext() and Gear.FIGHT_POLE or Gear.FIGHT_WEAPON
+        Say(lines[math.random(#lines)]); return false
+    end
     if GetTime() - swapAt < 1 then return false end -- previous swap still going through
     local toPole
     if target == "pole" then toPole = true

@@ -5,8 +5,13 @@ local Splash = {}
 ns.Splash = Splash
 
 Splash.BANNERS = {
-    { "fishon", "Fish On!" }, { "hooked", "Hooked!" }, { "gotone", "Got One!" }, { "yoink", "Yoink!" },
+    { "gotone", "Got One!" }, { "hooked", "Hooked!" }, { "yoink", "Yoink!" }, { "caughtit", "Caught It!" },
+    { "nicecatch", "Nice Catch!" }, { "reelsuccess", "Reel Success!" }, { "keeper", "That's a Keeper!" },
+    { "linestight", "Line's Tight!" }, { "biggercatch", "Bigger Catch!" }, { "anotherone", "Another One!" },
+    { "luckyduck", "Lucky Duck!" }, { "quack", "Quack!" },
 }
+-- only ever for a catch with treasure in it (a crate, chest or trunk)
+Splash.TREASURE = "treasure"
 local MAX_ROWS = 5
 local ROW_H = 38
 local ROW_TOP = 262 -- just under the banner art
@@ -156,8 +161,8 @@ end
 
 local function PickBanner()
     local list = Splash.BANNERS
-    local pick = ns.db.splashBanner or 0
-    if pick >= 1 and pick <= #list then return pick end
+    local pick = ns.db.splashBannerKey
+    for i, b in ipairs(list) do if b[1] == pick then return i end end
     -- random, never the same twice in a row
     local i = math.random(#list)
     if i == lastBanner and #list > 1 then i = i % #list + 1 end
@@ -185,8 +190,8 @@ function Splash:Show(items)
             count = bones, bones = true }
         items = copy
     end
-    local idx = PickBanner()
-    banner:SetTexture(ns.SplashArt("Catch", Splash.BANNERS[idx][1]))
+    banner:SetTexture(ns.SplashArt("Catch", Splash.HasTreasure(items) and Splash.TREASURE
+        or Splash.BANNERS[PickBanner()][1]))
 
     local shown = math.min(#items, MAX_ROWS)
     if #items > MAX_ROWS then shown = MAX_ROWS - 1 end
@@ -250,6 +255,17 @@ function Splash:Show(items)
     end
 end
 
+-- treasure in the catch: anything the journal files under treasure
+function Splash.HasTreasure(items)
+    local F = ns.JournalData and ns.JournalData.FINDS
+    if not F then return false end
+    for _, it in ipairs(items or {}) do
+        local f = it.id and F[it.id]
+        if f and f[1] == "treasure" then return true end
+    end
+    return false
+end
+
 -- call before looting
 function Splash.ReadLoot()
     local items = {}
@@ -282,10 +298,20 @@ end
 -- Misses
 -------------------------------------------------------------------------------
 -- art, hint, SOUNDKIT names (first one this client has)
+-- each kind of miss has a few signs; one at random, never the same twice running
 Splash.MISSES = {
-    timeout = { ns.SplashArt("Miss", "timeout"), "Seems you fell asleep.", { "IG_QUEST_LOG_ABANDON_QUEST", "IG_MAINMENU_CLOSE" } },
-    missed  = { ns.SplashArt("Miss", "away"), "You missed that one, try again!",       { "IG_QUEST_FAILED", "IG_QUEST_LOG_ABANDON_QUEST" } },
+    timeout = { { "timeout", "nobite" }, "Seems you fell asleep.", { "IG_QUEST_LOG_ABANDON_QUEST", "IG_MAINMENU_CLOSE" } },
+    missed  = { { "away", "missed", "oof", "soclose", "almost", "notthistime", "bummer", "empty" },
+        "You missed that one, try again!", { "IG_QUEST_FAILED", "IG_QUEST_LOG_ABANDON_QUEST" } },
 }
+local lastMiss = {}
+function Splash.MissArt(kind)
+    local list = (Splash.MISSES[kind] or Splash.MISSES.missed)[1]
+    local i = math.random(#list)
+    if i == lastMiss[kind] and #list > 1 then i = i % #list + 1 end
+    lastMiss[kind] = i
+    return ns.SplashArt("Miss", list[i]), list[i]
+end
 
 local function PlayFirst(names)
     if not SOUNDKIT then return end
@@ -355,7 +381,7 @@ end
 function Splash:ShowMiss(kind)
     if not ns.db.splashMisses then return end
     local m = Splash.MISSES[kind] or Splash.MISSES.missed
-    ShowSoft(m[1], m[2], ns.db.splashMissSound and m[3])
+    ShowSoft(Splash.MissArt(kind), m[2], ns.db.splashMissSound and m[3])
 end
 
 -- Pole swap: "pole" or "weapon"
